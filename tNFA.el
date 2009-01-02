@@ -124,6 +124,8 @@
   count tNFA-state  ; used internally in NFA evolution algorithms
   next)
 
+
+;; tag number for a tagged epsilon transition is stored in label slot
 (defalias 'tNFA-NFA-state-tag 'tNFA-NFA-state-label)
 
 (defmacro tNFA-NFA-state-tags (state)
@@ -131,7 +133,7 @@
 
 
 (defun tNFA-NFA-state-patch (attach state)
-  "Patch STATE onto ATTACH. Return value is meaningless."
+  ;; patch STATE onto ATTACH. Return value is meaningless
   (setf (tNFA-NFA-state-type attach)  (tNFA-NFA-state-type state)
 	(tNFA-NFA-state-label attach) (tNFA-NFA-state-label state)
 	(tNFA-NFA-state-next attach)  (tNFA-NFA-state-next state)
@@ -140,7 +142,7 @@
 
 
 (defun tNFA-NFA-state-make-epsilon (state next)
-  "Create an epsilon transition from STATE to NEXT."
+  ;; create an epsilon transition from STATE to NEXT
   (setf (tNFA-NFA-state-type state)  'epsilon
 	(tNFA-NFA-state-label state) nil
 	(tNFA-NFA-state-next state)  next
@@ -148,7 +150,7 @@
 
 
 (defun tNFA-NFA-state-make-branch (state next)
-  "Create a branch from STATE to all states in NEXT list."
+  ;; create a branch from STATE to all states in NEXT list
   (setf (tNFA-NFA-state-type state)  'branch
 	(tNFA-NFA-state-label state) nil
 	(tNFA-NFA-state-next state)  next)
@@ -161,18 +163,19 @@
 ;;;                        NFA fragments
 
 (defstruct
-  (NFA-fragment
+  (tNFA-fragment
    (:type vector)
    (:constructor nil)
-   (:constructor NFA-fragment-create (initial final))
+   (:constructor tNFA-fragment-create (initial final))
    (:copier nil))
   initial final)
 
 
-(defun NFA-fragment-patch (frag1 frag2)
-  "Patch FRAG2 onto end of FRAG1. Return value is meaningless."
-  (tNFA-NFA-state-patch (NFA-fragment-final frag1) (NFA-fragment-initial frag2))
-  (setf (NFA-fragment-final frag1) (NFA-fragment-final frag2)))
+(defun tNFA-fragment-patch (frag1 frag2)
+  ;; patch FRAG2 onto end of FRAG1; return value is meaningless
+  (tNFA-NFA-state-patch (tNFA-fragment-final frag1)
+			(tNFA-fragment-initial frag2))
+  (setf (tNFA-fragment-final frag1) (tNFA-fragment-final frag2)))
 
 
 
@@ -180,7 +183,7 @@
 ;;;                      tag tables
 
 (defun tNFA-tags-create (num-tags min-tags max-tags)
-  "Construct a new tags table."
+  ;; construct a new tags table
   (let ((vec (make-vector num-tags nil)))
     (dolist (tag min-tags)
       (aset vec tag (cons -1 'min)))
@@ -190,7 +193,7 @@
 
 
 (defun tNFA-tags-copy (tags)
-  "Return a copy of TAGS table."
+  ;; return a copy of TAGS table
   (let* ((len (length tags))
 	 (vec (make-vector len nil)))
     (dotimes (i len)
@@ -200,30 +203,49 @@
 
 
 (defmacro tNFA-tags-set (tags tag val)
-  "Set value of TAG in TAGS table to VAL."
+  ;; set value of TAG in TAGS table to VAL
   `(setcar (aref ,tags ,tag) ,val))
 
 
 (defmacro tNFA-tags-get (tags tag)
-  "Get value of TAG in TAGS table."
+  ;; get value of TAG in TAGS table
   `(car (aref ,tags ,tag)))
 
 
 (defmacro tNFA-tags-type (tags tag)
-  "Return the symbol `min' if TAG in TAGS table is a minimize tag,
-`max' if it is a maximize tag."
+  ;; return tag type ('min or 'max)
   `(cdr (aref ,tags ,tag)))
 
 
 (defun tNFA-tags< (val tag tags)
-  "Return non-nil if VAL takes precedence over the value of TAG in TAGS table,
-otherwise return nil."
+  ;; return non-nil if VAL takes precedence over the value of TAG in TAGS
+  ;; table, nil otherwise
   (setq tag (aref tags tag))
   (or (and (eq (cdr tag) 'min)
 	   (< val (car tag)))
     ;;(and (eq (cdr tag) 'max)
 	   (> val (car tag));)
 	   ))
+
+
+(defun tNFA-tags-to-groups (tags)
+  "Convert TAGS table to a list of indices of group matches.
+The nth element of the list is a cons cell, whose car is the
+starting index of the nth group and whose cdr is its end
+index. If a group didn't match, the corresponding list element
+will by null."
+  (let ((groups (make-list (/ (length tags) 2) nil))
+	group-stack
+	(grp 0))
+    (dotimes (i (length tags))
+      (if (eq (tNFA-tags-type tags i) 'max)
+	  (unless (= (tNFA-tags-get tags i) -1)
+	    (setf (nth (caar group-stack) groups)
+		  (cons (cdr (pop group-stack)) (tNFA-tags-get tags i))))
+	(unless (= (tNFA-tags-get tags i) -1)
+	  (push (cons grp (tNFA-tags-get tags i)) group-stack))
+	(incf grp)))
+    groups))
 
 
 
@@ -284,10 +306,6 @@ otherwise return nil."
 			 :test test))
 
 
-(defun tNFA-DFA-state-failed-p (state)
-  "Return t if STATE is a failed match, otherwise returns nil."
-  (null (tNFA-DFA-state-list state)))
-
 (defalias 'tNFA-DFA-state-match-p 'tNFA-DFA-state-match
   "Return non-nil if STATE is a matching state, otherwise returns nil.")
 
@@ -306,7 +324,7 @@ matches are always anchored, so `$' and `^' lose their special meanings.
 The return value is the initial state of the tagged NFA.
 
 The :test keyword argument specifies how to test whether two
-individual elements of a string are identical. The default is `eq'."
+individual elements of STRING are identical. The default is `eq'."
 
   ;; convert regexp to list, build NFA, and return initial state
   (declare (special NFA--state-id))
@@ -315,20 +333,31 @@ individual elements of a string are identical. The default is `eq'."
 	(tNFA--from-regexp (append regexp nil) 0 '() '() 'top-level))
     (if regexp
 	(error "Syntax error in regexp: missing \"(\"")
-      (setf (tNFA-NFA-state-type (NFA-fragment-final fragment)) 'match)
+      (setf (tNFA-NFA-state-type (tNFA-fragment-final fragment)) 'match)
       (tNFA-DFA-state-create-initial
        (tNFA-state-create-initial
-	(NFA-fragment-initial fragment) num-tags min-tags max-tags)
+	(tNFA-fragment-initial fragment) num-tags min-tags max-tags)
        :test test)
       )))
 
 
 
 (defun tNFA--from-regexp (regexp num-tags min-tags max-tags
-				 &optional top-level)
+				 &optional top-level shy-group)
+  ;; Construct a tagged NFA fragment from REGEXP, up to first end-group
+  ;; character or end of REGEXP. The TAGS arguments are used to pass the tags
+  ;; created so far. A non-nil TOP-LEVEL indicates that REGEXP is the complete
+  ;; regexp, so we're constructing the entire tNFA. A non-nil SHY-GROUP
+  ;; indicates that we're constructing a shy subgroup fragment. (Both optional
+  ;; arguments are only used for spotting syntax errors in REGEXP.)
+  ;;
+  ;; Returns a list: (FRAGMENT NUM-TAGS MIN-TAGS MAX-TAGS REGEXP). FRAGMENT is
+  ;; the constructed tNFA fragment, REGEXP is the remaining, unused portion of
+  ;; the regexp, and the TAGS return values give the tags created so far.
+
   (let* ((new (tNFA-NFA-state-create))
-	 (fragment-stack (list (NFA-fragment-create new new)))
-	 fragment attach token type)
+	 (fragment-stack (list (tNFA-fragment-create new new)))
+	 fragment attach token type group-end-tag)
 
     (catch 'constructed
       (while t
@@ -348,19 +377,53 @@ individual elements of a string are identical. The default is `eq'."
 	 ((and (eq type 'shy-group-end) top-level)
 	  (error "Syntax error in regexp: extra \")\" or missing \"(\""))
 
+	 ;; syntax error: ) ending a shy group
+	 ((and (eq type 'shy-group-end) (not shy-group))
+	  (error "Syntax error in regexp: \"(\" matched with \")?\""))
+
+	 ;; syntax error: )? ending a group
+	 ((and (eq type 'group-end) shy-group)
+	  (error "Syntax error in regexp: \"(?\" matched with \")\""))
+
 	 ;; syntax error: postfix operator not after atom
 	 ((or (eq type 'postfix*) (eq type 'postfix+) (eq type 'postfix?))
 	  (error "Syntax error in regexp: unexpected \"%s\""
 		 (char-to-string token)))
 
+
 	 ;; regexp atom: construct new literal fragment
 	 ((or (eq type 'literal) (eq type 'wildcard)
 	      (eq type 'char-alt) (eq type 'neg-char-alt))
-	  (setq new (tNFA-NFA-state-create type token (tNFA-NFA-state-create))
-		fragment (NFA-fragment-create new (tNFA-NFA-state-next new))))
+	  (setq new
+		(tNFA-NFA-state-create type token (tNFA-NFA-state-create))
+		fragment
+		(tNFA-fragment-create new (tNFA-NFA-state-next new))))
 
 	 ;; shy subgroup start: recursively construct subgroup fragment
 	 ((eq type 'shy-group-start)
+	  (setq new (tNFA--from-regexp regexp num-tags min-tags max-tags
+				       nil t)
+		num-tags (nth 1 new)
+		min-tags (nth 2 new)
+		max-tags (nth 3 new)
+		regexp   (nth 4 new)
+		fragment (nth 0 new)))
+
+	 ;; subgroup start: add minimize tag to current fragment, and
+	 ;;                 recursively construct subgroup fragment
+	 ((eq type 'group-start)
+	  (setq new (tNFA-NFA-state-create))
+	  (setq fragment
+		(tNFA-fragment-create
+		 (tNFA-NFA-state-create-tag
+		  (car (push (1- (incf num-tags)) min-tags))
+		  new)
+		 new))
+	  (tNFA-fragment-patch (car fragment-stack) fragment)
+	  ;; reserve next tag number for subgroup end tag
+	  (setq group-end-tag num-tags)
+	  (incf num-tags)
+	  ;; recursively construct subgroup fragment
 	  (setq new (tNFA--from-regexp regexp num-tags min-tags max-tags)
 		num-tags (nth 1 new)
 		min-tags (nth 2 new)
@@ -368,41 +431,14 @@ individual elements of a string are identical. The default is `eq'."
 		regexp   (nth 4 new)
 		fragment (nth 0 new)))
 
-	 ;; subgroup start: recursively construct subgroup fragment, attaching
-	 ;;                 minimize tag to the front
-	 ((eq type 'group-start)
-	  (setq new (tNFA-NFA-state-create))
-	  (setq fragment
-		(NFA-fragment-create
-		 (tNFA-NFA-state-create-tag
-		  (car (push (1- (incf num-tags)) min-tags))
-		  new)
-		 new))
-	  (setq new (tNFA--from-regexp regexp num-tags min-tags max-tags)
-		num-tags (nth 1 new)
-		min-tags (nth 2 new)
-		max-tags (nth 3 new)
-		regexp   (nth 4 new)
-		new      (nth 0 new))
-	  (NFA-fragment-patch fragment new))
-
 
 	 ;; end of regexp or subgroup: ...
 	 ((or (null type) (eq type 'shy-group-end) (eq type 'group-end))
 
-	  ;; if fragment-stack contains only one fragment...
+	  ;; if fragment-stack contains only one fragment, throw fragment up
+	  ;; to recursion level above
 	  (cond
 	   ((null (nth 1 fragment-stack))
-	    ;; if ending a group, add a maximize tag to end of fragment
-	    (when (eq type 'group-end)
-	      (setq new (tNFA-NFA-state-create)
-		    fragment (NFA-fragment-create
-			      (tNFA-NFA-state-create-tag
-			       (car (push (1- (incf num-tags)) max-tags))
-			       new)
-			      new))
-	      (NFA-fragment-patch (car fragment-stack) fragment))
-	    ;; throw fragment up to recursion level above
 	    (throw 'constructed
 		   (list (car fragment-stack)
 			 num-tags min-tags max-tags regexp)))
@@ -419,30 +455,20 @@ individual elements of a string are identical. The default is `eq'."
 	   ;;        \       .        /
 	   ;;                .
 	   (t
-	    ;; create a new fragment containing start and end of alternation;
-	    ;; if ending a group, make end of alternation a maximize tag
+	    ;; create a new fragment containing start and end of alternation
 	    (setq fragment
-		  (NFA-fragment-create
+		  (tNFA-fragment-create
 		   (tNFA-NFA-state-create-branch)
-		   (if (eq type 'group-end)
-		       (tNFA-NFA-state-create-tag
-			(car (push (1- (incf num-tags)) max-tags))
-			(tNFA-NFA-state-create))
-		     (tNFA-NFA-state-create))))
+		   (tNFA-NFA-state-create)))
 	    ;; patch alternation fragments into new fragment
 	    (dolist (frag fragment-stack)
-	      (push (NFA-fragment-initial frag)
-		    (tNFA-NFA-state-next (NFA-fragment-initial fragment)))
-	      (setf (tNFA-NFA-state-count (NFA-fragment-initial frag))
+	      (push (tNFA-fragment-initial frag)
+		    (tNFA-NFA-state-next (tNFA-fragment-initial fragment)))
+	      (setf (tNFA-NFA-state-count (tNFA-fragment-initial frag))
 		    (incf (tNFA-NFA-state-in-degree
-			   (NFA-fragment-initial frag))))
-	      (tNFA-NFA-state-make-epsilon (NFA-fragment-final frag)
-				      (NFA-fragment-final fragment)))
-	    ;; if ending a group, step the end of the fragment along one link,
-	    ;; to the blank state linked from the tag
-	    (when (eq type 'group-end)
-	      (setf (NFA-fragment-final fragment)
-		    (tNFA-NFA-state-next (NFA-fragment-final fragment))))
+			   (tNFA-fragment-initial frag))))
+	      (tNFA-NFA-state-make-epsilon (tNFA-fragment-final frag)
+				      (tNFA-fragment-final fragment)))
 	    ;; throw constructed fragment up to recursion level above
 	    (throw 'constructed
 		   (list fragment num-tags min-tags max-tags regexp)))
@@ -451,12 +477,12 @@ individual elements of a string are identical. The default is `eq'."
 	 ;; | alternation: start new fragment
 	 ((eq type 'alternation)
 	  (setq new (tNFA-NFA-state-create))
-	  (push (NFA-fragment-create new new) fragment-stack)))
+	  (push (tNFA-fragment-create new new) fragment-stack)))
 
 
 	;; ----- attach new fragment -----
 	(when fragment
-	  (setq attach (NFA-fragment-final (car fragment-stack)))
+	  (setq attach (tNFA-fragment-final (car fragment-stack)))
 	  (if (or (eq (car regexp) ?*)
 		  (eq (car regexp) ?+)
 		  (eq (car regexp) ??))
@@ -482,10 +508,10 @@ individual elements of a string are identical. The default is `eq'."
 		 ;;
 		 ((eq type 'postfix*)
 		  (tNFA-NFA-state-make-branch
-		   attach (list (NFA-fragment-initial fragment) new))
+		   attach (list (tNFA-fragment-initial fragment) new))
 		  (tNFA-NFA-state-make-epsilon
-		   (NFA-fragment-final fragment) attach)
-		  (setf (NFA-fragment-final (car fragment-stack)) new))
+		   (tNFA-fragment-final fragment) attach)
+		  (setf (tNFA-fragment-final (car fragment-stack)) new))
 
 		 ;;      .----.
 		 ;;     /      \
@@ -495,10 +521,10 @@ individual elements of a string are identical. The default is `eq'."
 		 ;;
 		 ((eq type 'postfix+)
 		  (tNFA-NFA-state-patch
-		   attach (NFA-fragment-initial fragment))
+		   attach (tNFA-fragment-initial fragment))
 		  (tNFA-NFA-state-make-branch
-		   (NFA-fragment-final fragment) (list attach new))
-		  (setf (NFA-fragment-final (car fragment-stack)) new))
+		   (tNFA-fragment-final fragment) (list attach new))
+		  (setf (tNFA-fragment-final (car fragment-stack)) new))
 
 		 ;;            .--fragment--.
 		 ;;           /              \
@@ -507,16 +533,26 @@ individual elements of a string are identical. The default is `eq'."
 		 ;;
 		 ((eq type 'postfix?)
 		  (tNFA-NFA-state-make-branch
-		   attach (list (NFA-fragment-initial fragment) new))
+		   attach (list (tNFA-fragment-initial fragment) new))
 		  (tNFA-NFA-state-make-epsilon
-		   (NFA-fragment-final fragment) new)
-		  (setf (NFA-fragment-final (car fragment-stack)) new))
+		   (tNFA-fragment-final fragment) new)
+		  (setf (tNFA-fragment-final (car fragment-stack)) new))
 		 ))
 
 
 	    ;; if next token is not a postfix operator, attach new fragment
 	    ;; onto end of current NFA fragment
-	    (NFA-fragment-patch (car fragment-stack) fragment)))
+	    (tNFA-fragment-patch (car fragment-stack) fragment))
+
+
+	  ;; if ending a group, add a maximize tag to end
+	  (when group-end-tag
+	    (setq new (tNFA-NFA-state-create)
+		  fragment (tNFA-fragment-create
+			    (tNFA-NFA-state-create-tag group-end-tag new)
+			    new))
+	    (push group-end-tag max-tags)
+	    (tNFA-fragment-patch (car fragment-stack) fragment)))
 	))  ; end of infinite loop and catch
     ))
 
@@ -655,14 +691,14 @@ individual elements of a string are identical. The default is `eq'."
   ;; STATE-SET itself.)
   (let ((queue (queue-create))
 	(result '())
-	(seen '())
+	(reset '())
 	state next tags)
     ;; temporarily link the NFA states to their corresponding tNFA states, and
     ;; add them to the queue
     (dolist (t-state state-set)
       (setf state (tNFA-state-NFA-state t-state)
 	    (tNFA-NFA-state-tNFA-state state) t-state)
-      (push t-state seen)
+      (push state reset)
       (queue-enqueue queue state))
 
     (while (setq state (queue-dequeue queue))
@@ -677,7 +713,7 @@ individual elements of a string are identical. The default is `eq'."
 	    (setf (tNFA-NFA-state-tNFA-state next)
 		  (tNFA-state-create
 		   next (tNFA-tags-copy (tNFA-NFA-state-tags state))))
-	    (push (tNFA-NFA-state-tNFA-state next) seen)
+	    (push next reset)
 	    ;; if next state hasn't already been seen in-degree times, add it
 	    ;; to the end of the queue
 	    (if (/= (decf (tNFA-NFA-state-count next)) 0)
@@ -706,7 +742,7 @@ individual elements of a string are identical. The default is `eq'."
 	    (tNFA-tags-set tags (tNFA-NFA-state-tag state) pos)
 	    (setf (tNFA-NFA-state-tNFA-state next)
 		  (tNFA-state-create next tags))
-	    (push (tNFA-NFA-state-tNFA-state next) seen))
+	    (push next reset))
 	  ;; if next state hasn't already been seen in-degree times, add it to
 	  ;; the end of the queue
 	  (if (/= (decf (tNFA-NFA-state-count next)) 0)
@@ -721,10 +757,9 @@ individual elements of a string are identical. The default is `eq'."
        ))
 
     ;; reset temporary NFA state link and count
-    (dolist (state seen)
-      (setf (tNFA-NFA-state-tNFA-state (tNFA-state-NFA-state state)) nil
-	    (tNFA-NFA-state-count (tNFA-state-NFA-state state))
-	      (tNFA-NFA-state-in-degree (tNFA-state-NFA-state state))))
+    (dolist (state reset)
+      (setf (tNFA-NFA-state-tNFA-state state) nil
+	    (tNFA-NFA-state-count state) (tNFA-NFA-state-in-degree state)))
     ;; sort result states
     (sort result (lambda (a b) (< (tNFA-state-id a) (tNFA-state-id b))))
     ))
@@ -734,12 +769,15 @@ individual elements of a string are identical. The default is `eq'."
 ;;; ================================================================
 ;;;                       tNFA matching
 
-(defun tNFA-regexp-match (regexp string)
+(defun* tNFA-regexp-match (regexp string &key (test 'eq))
   "Return non-nil if STRING matches REGEXP, nil otherwise.
 Sets the match data if there was a match; see `match-beginning',
-`match-end' and `match-string'."
+`match-end' and `match-string'.
 
-  (let ((tNFA (tNFA-from-regexp regexp))
+The :test keyword argument specifies how to test whether two
+individual elements of STRING are identical. The default is `eq'."
+
+  (let ((tNFA (tNFA-from-regexp regexp :test test))
 	(i -1) tags match-data group-stack (grp 0))
 
     ;; evolve tNFA according to characters of STRING
@@ -767,27 +805,6 @@ Sets the match data if there was a match; see `match-beginning',
 		    (tNFA-tags-get tags i)))))
 	(set-match-data match-data)
 	tags))))
-
-
-
-(defun tNFA-tags-to-groups (tags)
-  "Convert TAGS table to a list of indices of group matches.
-The nth element of the list is a cons cell, whose car is the
-starting index of the nth group and whose cdr is its end
-index. If a group didn't match, the corresponding list element
-will by null."
-  (let ((groups (make-list (/ (length tags) 2) nil))
-	group-stack
-	(grp 0))
-    (dotimes (i (length tags))
-      (if (eq (tNFA-tags-type tags i) 'max)
-	  (unless (= (tNFA-tags-get tags i) -1)
-	    (setf (nth (caar group-stack) groups)
-		  (cons (cdr (pop group-stack)) (tNFA-tags-get tags i))))
-	(unless (= (tNFA-tags-get tags i) -1)
-	  (push (cons grp (tNFA-tags-get tags i)) group-stack))
-	(incf grp)))
-    groups))
 
 
 ;;; tNFA.el ends here
