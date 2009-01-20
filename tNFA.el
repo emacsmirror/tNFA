@@ -42,9 +42,23 @@
 ;;; Code:
 
 (eval-when-compile (require 'cl))
-
 (require 'queue)
 (provide 'tNFA)
+
+
+
+;;; ================================================================
+;;;                  Replcements for CL functions
+
+(defun* tNFA--assoc (item alist &key (test 'eq))
+  ;; Return first cons cell in ALIST whose CAR matches ITEM according to :test
+  ;; function (defaulting to `eq')
+  (while (and alist
+	      (or (not (consp (car alist)))
+		  (not (funcall test item (caar alist)))))
+    (setq alist (cdr alist)))
+  (car alist))
+
 
 
 ;;; ================================================================
@@ -180,6 +194,81 @@
 
 
 ;;; ----------------------------------------------------------------
+;;;                      DFA states
+
+(defstruct
+  (tNFA--DFA-state
+   :named
+   (:constructor nil)
+   (:constructor tNFA--DFA-state--create
+		 (list pool
+		  &key
+		  (test 'eq)
+		  &aux
+		  (transitions ())))
+   (:copier nil))
+  list transitions test wildcard match pool)
+
+
+(defun* tNFA--DFA-state-create (state-list state-pool &key (test 'eq))
+  ;; create DFA state and add it to the state pool
+  (let ((DFA-state (tNFA--DFA-state--create
+		    state-list state-pool :test test))
+	tmp-list)
+    (puthash state-list DFA-state (tNFA--DFA-state-pool DFA-state))
+
+    (dolist (state state-list)
+      ;; if state in state list is...
+      (cond
+       ;; literal state: add literal transition
+       ((eq (tNFA--state-type state) 'literal)
+	(setq tmp-list (tNFA--DFA-state-transitions DFA-state))
+	(add-to-list 'tmp-list (cons (tNFA--state-label state) t))
+	(setf (tNFA--DFA-state-transitions DFA-state) tmp-list))
+
+       ;; character alternative: add transitions for all alternatives
+       ((eq (tNFA--state-type state) 'char-alt)
+	(dolist (c (tNFA--state-label state))
+	  (setq tmp-list (tNFA--DFA-state-transitions DFA-state))
+	  (add-to-list 'tmp-list (cons c t))
+	  (setf (tNFA--DFA-state-transitions DFA-state) tmp-list)))
+
+       ;; wildcard or negated character alternative: add wildcard transistion
+       ((or (eq (tNFA--state-type state) 'wildcard)
+	    (eq (tNFA--state-type state) 'neg-char-alt))
+	(setf (tNFA--DFA-state-wildcard DFA-state) t))
+
+       ;; match state: set match tags
+       ((eq (tNFA--state-type state) 'match)
+	(setf (tNFA--DFA-state-match DFA-state)
+	      (tNFA--state-tags state)))))
+
+    ;; return constructed state
+    DFA-state))
+
+
+(defun* tNFA--DFA-state-create-initial (state-list &key (test 'eq))
+  ;; create initial DFA state from initial tNFA state INITIAL-STATE
+  (tNFA--DFA-state-create state-list
+			  (make-hash-table :test 'equal)
+			  :test test))
+
+
+(defalias 'tNFA-match-p 'tNFA--DFA-state-match
+  "Return non-nil if STATE is a matching state, otherwise return nil.")
+
+
+(defalias 'tNFA-wildcard-p 'tNFA--DFA-state-wildcard
+  "Return non-nil if STATE has a wildcard transition, otherwise return nil.")
+
+
+(defun tNFA-transitions (state)
+  "Return list of literal transitions from tNFA state STATE."
+  (mapcar 'car (tNFA--DFA-state-transitions state)))
+
+
+
+;;; ----------------------------------------------------------------
 ;;;                      tag tables
 
 (defun tNFA-tags-create (num-tags min-tags max-tags)
@@ -245,81 +334,6 @@
 	  (push (cons grp (tNFA-tags-get tags i)) group-stack))
 	(incf grp)))
     groups))
-
-
-
-;;; ----------------------------------------------------------------
-;;;                      DFA states
-
-(defstruct
-  (tNFA--DFA-state
-   :named
-   (:constructor nil)
-   (:constructor tNFA--DFA-state--create
-		 (list pool
-		  &key
-		  (test 'eq)
-		  &aux
-		  (transitions (make-hash-table :test test))))
-   (:constructor tNFA--DFA-state-create-failed ())
-   (:copier nil))
-  list transitions wildcard match pool)
-
-
-(defun* tNFA--DFA-state-create (state-list state-pool &key (test 'eq))
-  ;; create DFA state and add it to the state pool
-  (let ((DFA-state (tNFA--DFA-state--create
-		    state-list state-pool :test test)))
-    (puthash state-list DFA-state (tNFA--DFA-state-pool DFA-state))
-
-    (dolist (state state-list)
-      ;; if state in state list is...
-      (cond
-       ;; literal state: add literal transition
-       ((eq (tNFA--state-type state) 'literal)
-	(puthash (tNFA--state-label state) t
-		 (tNFA--DFA-state-transitions DFA-state)))
-
-       ;; character alternative: add transitions for all alternatives
-       ((eq (tNFA--state-type state) 'char-alt)
-	(dolist (c (tNFA--state-label state))
-	  (puthash c t (tNFA--DFA-state-transitions DFA-state))))
-
-       ;; wildcard or negated character alternative: add wildcard transistion
-       ((or (eq (tNFA--state-type state) 'wildcard)
-	    (eq (tNFA--state-type state) 'neg-char-alt))
-	(setf (tNFA--DFA-state-wildcard DFA-state) t))
-
-       ;; match state: set match tags
-       ((eq (tNFA--state-type state) 'match)
-	(setf (tNFA--DFA-state-match DFA-state)
-	      (tNFA--state-tags state)))))
-
-    ;; return constructed state
-    DFA-state))
-
-
-(defun* tNFA--DFA-state-create-initial (state-list &key (test 'eq))
-  ;; create initial DFA state from initial tNFA state INITIAL-STATE
-  (tNFA--DFA-state-create state-list
-			  (make-hash-table :test 'equal)
-			  :test test))
-
-
-(defalias 'tNFA-match-p 'tNFA--DFA-state-match
-  "Return non-nil if STATE is a matching state, otherwise return nil.")
-
-
-(defalias 'tNFA-wildcard-p 'tNFA--DFA-state-wildcard
-  "Return non-nil if STATE has a wildcard transition, otherwise return nil.")
-
-
-(defun tNFA-transitions (state)
-  "Return list of literal transitions from tNFA state STATE."
-  (let (transitions)
-    (maphash (lambda (chr ignored) (push chr transitions))
-	     (tNFA--DFA-state-transitions state))
-    transitions))
 
 
 
@@ -644,14 +658,15 @@ individual elements of STRING are identical. The default is `eq'."
 (defun tNFA-next-state (tNFA chr pos)
   "Evolve tNFA according to CHR, which corresponds to position
 POS in a string."
-  (let (state)
+  (let (elem state)
     ;; if there is a transition for character CHR...
     (cond
-     ((setq state (gethash chr (tNFA--DFA-state-transitions tNFA)))
+     ((setq elem (tNFA--assoc chr (tNFA--DFA-state-transitions tNFA)
+			       :test (tNFA--DFA-state-test tNFA)))
       ;; if next state has not already been computed, do so
-      (unless (tNFA--DFA-state-p state)
+      (unless (tNFA--DFA-state-p (setq state (cdr elem)))
 	(setq state (tNFA--DFA-next-state tNFA chr pos nil))
-	(puthash chr state (tNFA--DFA-state-transitions tNFA))))
+	(setcdr elem state)))
 
      ;; if there's a wildcard transition...
      ((setq state (tNFA--DFA-state-wildcard tNFA))
@@ -696,8 +711,7 @@ POS in a string."
 		(tNFA--DFA-state-create
 		 state-list
 		 (tNFA--DFA-state-pool DFA-state)
-		 :test
-		 (hash-table-test (tNFA--DFA-state-transitions DFA-state)))))
+		 :test (tNFA--DFA-state-test DFA-state))))
       ;; return next state
       state)))
 
