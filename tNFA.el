@@ -54,32 +54,32 @@
 ;;;                    tagged NFA states
 
 (defstruct
-  (tNFA-state
+  (tNFA--state
    (:constructor nil)
-   (:constructor tNFA-state-create-initial
+   (:constructor tNFA--state-create-initial
 		 (NFA-state num-tags min-tags max-tags
 		  &aux (tags (tNFA-tags-create num-tags min-tags max-tags))))
-   (:constructor tNFA-state-create (NFA-state tags))
+   (:constructor tNFA--state-create (NFA-state tags))
    (:copier nil))
   NFA-state tags)
 
-(defmacro tNFA-state-id (state)
-  `(tNFA-NFA-state-id (tNFA-state-NFA-state ,state)))
+(defmacro tNFA--state-id (state)
+  `(tNFA--NFA-state-id (tNFA--state-NFA-state ,state)))
 
-(defmacro tNFA-state-type (state)
-  `(tNFA-NFA-state-type (tNFA-state-NFA-state ,state)))
+(defmacro tNFA--state-type (state)
+  `(tNFA--NFA-state-type (tNFA--state-NFA-state ,state)))
 
-(defmacro tNFA-state-label (state)
-  `(tNFA-NFA-state-label (tNFA-state-NFA-state ,state)))
+(defmacro tNFA--state-label (state)
+  `(tNFA--NFA-state-label (tNFA--state-NFA-state ,state)))
 
-(defmacro tNFA-state-in-degree (state)
-  `(tNFA-NFA-state-in-degree (tNFA-state-NFA-state ,state)))
+(defmacro tNFA--state-in-degree (state)
+  `(tNFA--NFA-state-in-degree (tNFA--state-NFA-state ,state)))
 
-(defmacro tNFA-state-next (state)
-  `(tNFA-NFA-state-next (tNFA-state-NFA-state ,state)))
+(defmacro tNFA--state-next (state)
+  `(tNFA--NFA-state-next (tNFA--state-NFA-state ,state)))
 
-(defmacro tNFA-state-count (state)
-  `(tNFA-NFA-state-count (tNFA-state-NFA-state ,state)))
+(defmacro tNFA--state-count (state)
+  `(tNFA--NFA-state-count (tNFA--state-NFA-state ,state)))
 
 
 
@@ -89,26 +89,26 @@
 (declare (special NFA--state-id))
 
 (defstruct
-  (tNFA-NFA-state
+  (tNFA--NFA-state
    (:type vector)
    (:constructor nil)
-   (:constructor tNFA-NFA-state-create
+   (:constructor tNFA--NFA-state-create
 		 (&optional type label next
 		  &aux
 		  (in-degree 0)
 		  (count 0)
 		  (id (incf NFA--state-id))
 		  (dummy (when next
-			   (setf (tNFA-NFA-state-count next)
-				 (incf (tNFA-NFA-state-in-degree next)))))))
-   (:constructor tNFA-NFA-state-create-branch
+			   (setf (tNFA--NFA-state-count next)
+				 (incf (tNFA--NFA-state-in-degree next)))))))
+   (:constructor tNFA--NFA-state-create-branch
 		 (&rest next
 		  &aux
 		  (type 'branch)
 		  (in-degree 0)
 		  (count 0)
 		  (id (incf NFA--state-id))))
-   (:constructor tNFA-NFA-state-create-tag
+   (:constructor tNFA--NFA-state-create-tag
 		 (tag &optional next
 		  &aux
 		  (type 'tag)
@@ -117,8 +117,8 @@
 		  (count 0)
 		  (id (incf NFA--state-id))
 		  (dummy (when next
-			   (setf (tNFA-NFA-state-count next)
-				 (incf (tNFA-NFA-state-in-degree next)))))))
+			   (setf (tNFA--NFA-state-count next)
+				 (incf (tNFA--NFA-state-in-degree next)))))))
    (:copier nil))
   id type label in-degree
   count tNFA-state  ; used internally in NFA evolution algorithms
@@ -126,36 +126,36 @@
 
 
 ;; tag number for a tagged epsilon transition is stored in label slot
-(defalias 'tNFA-NFA-state-tag 'tNFA-NFA-state-label)
+(defalias 'tNFA--NFA-state-tag 'tNFA--NFA-state-label)
 
-(defmacro tNFA-NFA-state-tags (state)
-  `(tNFA-state-tags (tNFA-NFA-state-tNFA-state ,state)))
+(defmacro tNFA--NFA-state-tags (state)
+  `(tNFA--state-tags (tNFA--NFA-state-tNFA-state ,state)))
 
 
-(defun tNFA-NFA-state-patch (attach state)
+(defun tNFA--NFA-state-patch (attach state)
   ;; patch STATE onto ATTACH. Return value is meaningless
-  (setf (tNFA-NFA-state-type attach)  (tNFA-NFA-state-type state)
-	(tNFA-NFA-state-label attach) (tNFA-NFA-state-label state)
-	(tNFA-NFA-state-next attach)  (tNFA-NFA-state-next state)
-	(tNFA-NFA-state-count state)  (incf (tNFA-NFA-state-in-degree state))
+  (setf (tNFA--NFA-state-type attach)  (tNFA--NFA-state-type state)
+	(tNFA--NFA-state-label attach) (tNFA--NFA-state-label state)
+	(tNFA--NFA-state-next attach)  (tNFA--NFA-state-next state)
+	(tNFA--NFA-state-count state)  (incf (tNFA--NFA-state-in-degree state))
 	))
 
 
-(defun tNFA-NFA-state-make-epsilon (state next)
+(defun tNFA--NFA-state-make-epsilon (state next)
   ;; create an epsilon transition from STATE to NEXT
-  (setf (tNFA-NFA-state-type state)  'epsilon
-	(tNFA-NFA-state-label state) nil
-	(tNFA-NFA-state-next state)  next
-	(tNFA-NFA-state-count next)  (incf (tNFA-NFA-state-in-degree next))))
+  (setf (tNFA--NFA-state-type state)  'epsilon
+	(tNFA--NFA-state-label state) nil
+	(tNFA--NFA-state-next state)  next
+	(tNFA--NFA-state-count next)  (incf (tNFA--NFA-state-in-degree next))))
 
 
-(defun tNFA-NFA-state-make-branch (state next)
+(defun tNFA--NFA-state-make-branch (state next)
   ;; create a branch from STATE to all states in NEXT list
-  (setf (tNFA-NFA-state-type state)  'branch
-	(tNFA-NFA-state-label state) nil
-	(tNFA-NFA-state-next state)  next)
+  (setf (tNFA--NFA-state-type state)  'branch
+	(tNFA--NFA-state-label state) nil
+	(tNFA--NFA-state-next state)  next)
   (dolist (n next)
-    (setf (tNFA-NFA-state-count n) (incf (tNFA-NFA-state-in-degree n)))))
+    (setf (tNFA--NFA-state-count n) (incf (tNFA--NFA-state-in-degree n)))))
 
 
 
@@ -163,19 +163,19 @@
 ;;;                        NFA fragments
 
 (defstruct
-  (tNFA-fragment
+  (tNFA--fragment
    (:type vector)
    (:constructor nil)
-   (:constructor tNFA-fragment-create (initial final))
+   (:constructor tNFA--fragment-create (initial final))
    (:copier nil))
   initial final)
 
 
-(defun tNFA-fragment-patch (frag1 frag2)
+(defun tNFA--fragment-patch (frag1 frag2)
   ;; patch FRAG2 onto end of FRAG1; return value is meaningless
-  (tNFA-NFA-state-patch (tNFA-fragment-final frag1)
-			(tNFA-fragment-initial frag2))
-  (setf (tNFA-fragment-final frag1) (tNFA-fragment-final frag2)))
+  (tNFA--NFA-state-patch (tNFA--fragment-final frag1)
+			(tNFA--fragment-initial frag2))
+  (setf (tNFA--fragment-final frag1) (tNFA--fragment-final frag2)))
 
 
 
@@ -228,12 +228,11 @@
 	   ))
 
 
-(defun tNFA-tags-to-groups (tags)
-  "Convert TAGS table to a list of indices of group matches.
-The nth element of the list is a cons cell, whose car is the
-starting index of the nth group and whose cdr is its end
-index. If a group didn't match, the corresponding list element
-will by null."
+(defun tNFA--tags-to-groups (tags)
+  ;; Convert TAGS table to a list of indices of group matches. The n'th
+  ;; element of the list is a cons cell, whose car is the starting index of
+  ;; the nth group and whose cdr is its end index. If a group didn't match,
+  ;; the corresponding list element will by null."
   (let ((groups (make-list (/ (length tags) 2) nil))
 	group-stack
 	(grp 0))
@@ -253,61 +252,74 @@ will by null."
 ;;;                      DFA states
 
 (defstruct
-  (tNFA-DFA-state
+  (tNFA--DFA-state
    :named
    (:constructor nil)
-   (:constructor tNFA--DFA-state-create
+   (:constructor tNFA--DFA-state--create
 		 (list pool
-		  &key (test 'eq)
+		  &key
+		  (test 'eq)
 		  &aux
 		  (transitions (make-hash-table :test test))))
-   (:constructor tNFA-DFA-state-create-failed ())
+   (:constructor tNFA--DFA-state-create-failed ())
    (:copier nil))
   list transitions wildcard match pool)
 
 
-(defun* tNFA-DFA-state-create (state-list state-pool &key (test 'eq))
+(defun* tNFA--DFA-state-create (state-list state-pool &key (test 'eq))
   ;; create DFA state and add it to the state pool
-  (let ((DFA-state (tNFA--DFA-state-create
+  (let ((DFA-state (tNFA--DFA-state--create
 		    state-list state-pool :test test)))
-    (puthash state-list DFA-state (tNFA-DFA-state-pool DFA-state))
+    (puthash state-list DFA-state (tNFA--DFA-state-pool DFA-state))
 
     (dolist (state state-list)
       ;; if state in state list is...
       (cond
        ;; literal state: add literal transition
-       ((eq (tNFA-state-type state) 'literal)
-	(puthash (tNFA-state-label state) t
-		 (tNFA-DFA-state-transitions DFA-state)))
+       ((eq (tNFA--state-type state) 'literal)
+	(puthash (tNFA--state-label state) t
+		 (tNFA--DFA-state-transitions DFA-state)))
 
        ;; character alternative: add transitions for all alternatives
-       ((eq (tNFA-state-type state) 'char-alt)
-	(dolist (c (tNFA-state-label state))
-	  (puthash c t (tNFA-DFA-state-transitions DFA-state))))
+       ((eq (tNFA--state-type state) 'char-alt)
+	(dolist (c (tNFA--state-label state))
+	  (puthash c t (tNFA--DFA-state-transitions DFA-state))))
 
        ;; wildcard or negated character alternative: add wildcard transistion
-       ((or (eq (tNFA-state-type state) 'wildcard)
-	    (eq (tNFA-state-type state) 'neg-char-alt))
-	(setf (tNFA-DFA-state-wildcard DFA-state) t))
+       ((or (eq (tNFA--state-type state) 'wildcard)
+	    (eq (tNFA--state-type state) 'neg-char-alt))
+	(setf (tNFA--DFA-state-wildcard DFA-state) t))
 
        ;; match state: set match tags
-       ((eq (tNFA-state-type state) 'match)
-	(setf (tNFA-DFA-state-match DFA-state)
-	      (tNFA-state-tags state)))))
+       ((eq (tNFA--state-type state) 'match)
+	(setf (tNFA--DFA-state-match DFA-state)
+	      (tNFA--state-tags state)))))
 
     ;; return constructed state
     DFA-state))
 
 
-(defun* tNFA-DFA-state-create-initial (initial-state &key (test 'eq))
+(defun* tNFA--DFA-state-create-initial (state-list &key (test 'eq))
   ;; create initial DFA state from initial tNFA state INITIAL-STATE
-  (tNFA-DFA-state-create (list initial-state)
-			 (make-hash-table :test 'equal)
-			 :test test))
+  (tNFA--DFA-state-create state-list
+			  (make-hash-table :test 'equal)
+			  :test test))
 
 
-(defalias 'tNFA-DFA-state-match-p 'tNFA-DFA-state-match
-  "Return non-nil if STATE is a matching state, otherwise returns nil.")
+(defalias 'tNFA-match-p 'tNFA--DFA-state-match
+  "Return non-nil if STATE is a matching state, otherwise return nil.")
+
+
+(defalias 'tNFA-wildcard-p 'tNFA--DFA-state-wildcard
+  "Return non-nil if STATE has a wildcard transition, otherwise return nil.")
+
+
+(defun tNFA-transitions (state)
+  "Return list of literal transitions from tNFA state STATE."
+  (let (transitions)
+    (maphash (lambda (chr ignored) (push chr transitions))
+	     (tNFA--DFA-state-transitions state))
+    transitions))
 
 
 
@@ -318,8 +330,9 @@ will by null."
 (defun* tNFA-from-regexp (regexp &key (test 'eq))
   "Create a tagged NFA that recognizes the regular expression REGEXP.
 
-Back-references and non-greedy postfix operators are *not* supported, and the
-matches are always anchored, so `$' and `^' lose their special meanings.
+Back-references and non-greedy postfix operators are *not*
+supported, and the matches are always anchored, so `$' and `^'
+lose their special meanings.
 
 The return value is the initial state of the tagged NFA.
 
@@ -333,10 +346,13 @@ individual elements of STRING are identical. The default is `eq'."
 	(tNFA--from-regexp (append regexp nil) 0 '() '() 'top-level))
     (if regexp
 	(error "Syntax error in regexp: missing \"(\"")
-      (setf (tNFA-NFA-state-type (tNFA-fragment-final fragment)) 'match)
-      (tNFA-DFA-state-create-initial
-       (tNFA-state-create-initial
-	(tNFA-fragment-initial fragment) num-tags min-tags max-tags)
+      (setf (tNFA--NFA-state-type (tNFA--fragment-final fragment)) 'match)
+      (tNFA--DFA-state-create-initial
+       (tNFA--epsilon-boundary
+	(list
+	 (tNFA--state-create-initial
+	  (tNFA--fragment-initial fragment) num-tags min-tags max-tags))
+	0)
        :test test)
       )))
 
@@ -355,17 +371,18 @@ individual elements of STRING are identical. The default is `eq'."
   ;; the constructed tNFA fragment, REGEXP is the remaining, unused portion of
   ;; the regexp, and the TAGS return values give the tags created so far.
 
-  (let* ((new (tNFA-NFA-state-create))
-	 (fragment-stack (list (tNFA-fragment-create new new)))
+  (let* ((new (tNFA--NFA-state-create))
+	 (fragment-stack (list (tNFA--fragment-create new new)))
 	 fragment attach token type group-end-tag)
 
     (catch 'constructed
       (while t
-	(setq regexp (NFA-regexp-next-token regexp)
+	(setq regexp (tNFA--regexp-next-token regexp)
 	      type   (nth 0 regexp)
 	      token  (nth 1 regexp)
 	      regexp (nth 2 regexp))
-	(setq fragment nil)
+	(setq fragment nil
+	      group-end-tag nil)
 
 	;; ----- construct new fragment -----
 	(cond
@@ -395,9 +412,9 @@ individual elements of STRING are identical. The default is `eq'."
 	 ((or (eq type 'literal) (eq type 'wildcard)
 	      (eq type 'char-alt) (eq type 'neg-char-alt))
 	  (setq new
-		(tNFA-NFA-state-create type token (tNFA-NFA-state-create))
+		(tNFA--NFA-state-create type token (tNFA--NFA-state-create))
 		fragment
-		(tNFA-fragment-create new (tNFA-NFA-state-next new))))
+		(tNFA--fragment-create new (tNFA--NFA-state-next new))))
 
 	 ;; shy subgroup start: recursively construct subgroup fragment
 	 ((eq type 'shy-group-start)
@@ -412,14 +429,14 @@ individual elements of STRING are identical. The default is `eq'."
 	 ;; subgroup start: add minimize tag to current fragment, and
 	 ;;                 recursively construct subgroup fragment
 	 ((eq type 'group-start)
-	  (setq new (tNFA-NFA-state-create))
+	  (setq new (tNFA--NFA-state-create))
 	  (setq fragment
-		(tNFA-fragment-create
-		 (tNFA-NFA-state-create-tag
+		(tNFA--fragment-create
+		 (tNFA--NFA-state-create-tag
 		  (car (push (1- (incf num-tags)) min-tags))
 		  new)
 		 new))
-	  (tNFA-fragment-patch (car fragment-stack) fragment)
+	  (tNFA--fragment-patch (car fragment-stack) fragment)
 	  ;; reserve next tag number for subgroup end tag
 	  (setq group-end-tag num-tags)
 	  (incf num-tags)
@@ -457,18 +474,18 @@ individual elements of STRING are identical. The default is `eq'."
 	   (t
 	    ;; create a new fragment containing start and end of alternation
 	    (setq fragment
-		  (tNFA-fragment-create
-		   (tNFA-NFA-state-create-branch)
-		   (tNFA-NFA-state-create)))
+		  (tNFA--fragment-create
+		   (tNFA--NFA-state-create-branch)
+		   (tNFA--NFA-state-create)))
 	    ;; patch alternation fragments into new fragment
 	    (dolist (frag fragment-stack)
-	      (push (tNFA-fragment-initial frag)
-		    (tNFA-NFA-state-next (tNFA-fragment-initial fragment)))
-	      (setf (tNFA-NFA-state-count (tNFA-fragment-initial frag))
-		    (incf (tNFA-NFA-state-in-degree
-			   (tNFA-fragment-initial frag))))
-	      (tNFA-NFA-state-make-epsilon (tNFA-fragment-final frag)
-				      (tNFA-fragment-final fragment)))
+	      (push (tNFA--fragment-initial frag)
+		    (tNFA--NFA-state-next (tNFA--fragment-initial fragment)))
+	      (setf (tNFA--NFA-state-count (tNFA--fragment-initial frag))
+		    (incf (tNFA--NFA-state-in-degree
+			   (tNFA--fragment-initial frag))))
+	      (tNFA--NFA-state-make-epsilon (tNFA--fragment-final frag)
+				      (tNFA--fragment-final fragment)))
 	    ;; throw constructed fragment up to recursion level above
 	    (throw 'constructed
 		   (list fragment num-tags min-tags max-tags regexp)))
@@ -476,13 +493,13 @@ individual elements of STRING are identical. The default is `eq'."
 
 	 ;; | alternation: start new fragment
 	 ((eq type 'alternation)
-	  (setq new (tNFA-NFA-state-create))
-	  (push (tNFA-fragment-create new new) fragment-stack)))
+	  (setq new (tNFA--NFA-state-create))
+	  (push (tNFA--fragment-create new new) fragment-stack)))
 
 
 	;; ----- attach new fragment -----
 	(when fragment
-	  (setq attach (tNFA-fragment-final (car fragment-stack)))
+	  (setq attach (tNFA--fragment-final (car fragment-stack)))
 	  (if (or (eq (car regexp) ?*)
 		  (eq (car regexp) ?+)
 		  (eq (car regexp) ??))
@@ -492,11 +509,11 @@ individual elements of STRING are identical. The default is `eq'."
 
 		;; if next token is a postfix operator, splice new fragment
 		;; into NFA as appropriate
-		(setq regexp (NFA-regexp-next-token regexp)
+		(setq regexp (tNFA--regexp-next-token regexp)
 		      type   (nth 0 regexp)
 		      token  (nth 1 regexp)
 		      regexp (nth 2 regexp))
-		(setq new (tNFA-NFA-state-create))
+		(setq new (tNFA--NFA-state-create))
 
 		(cond
 
@@ -507,11 +524,11 @@ individual elements of STRING are identical. The default is `eq'."
 		 ;;  ---attach-----new---
 		 ;;
 		 ((eq type 'postfix*)
-		  (tNFA-NFA-state-make-branch
-		   attach (list (tNFA-fragment-initial fragment) new))
-		  (tNFA-NFA-state-make-epsilon
-		   (tNFA-fragment-final fragment) attach)
-		  (setf (tNFA-fragment-final (car fragment-stack)) new))
+		  (tNFA--NFA-state-make-branch
+		   attach (list (tNFA--fragment-initial fragment) new))
+		  (tNFA--NFA-state-make-epsilon
+		   (tNFA--fragment-final fragment) attach)
+		  (setf (tNFA--fragment-final (car fragment-stack)) new))
 
 		 ;;      .----.
 		 ;;     /      \
@@ -520,11 +537,11 @@ individual elements of STRING are identical. The default is `eq'."
 		 ;;  ---fragment-----new---
 		 ;;
 		 ((eq type 'postfix+)
-		  (tNFA-NFA-state-patch
-		   attach (tNFA-fragment-initial fragment))
-		  (tNFA-NFA-state-make-branch
-		   (tNFA-fragment-final fragment) (list attach new))
-		  (setf (tNFA-fragment-final (car fragment-stack)) new))
+		  (tNFA--NFA-state-patch
+		   attach (tNFA--fragment-initial fragment))
+		  (tNFA--NFA-state-make-branch
+		   (tNFA--fragment-final fragment) (list attach new))
+		  (setf (tNFA--fragment-final (car fragment-stack)) new))
 
 		 ;;            .--fragment--.
 		 ;;           /              \
@@ -532,33 +549,33 @@ individual elements of STRING are identical. The default is `eq'."
 		 ;;           \______________/
 		 ;;
 		 ((eq type 'postfix?)
-		  (tNFA-NFA-state-make-branch
-		   attach (list (tNFA-fragment-initial fragment) new))
-		  (tNFA-NFA-state-make-epsilon
-		   (tNFA-fragment-final fragment) new)
-		  (setf (tNFA-fragment-final (car fragment-stack)) new))
+		  (tNFA--NFA-state-make-branch
+		   attach (list (tNFA--fragment-initial fragment) new))
+		  (tNFA--NFA-state-make-epsilon
+		   (tNFA--fragment-final fragment) new)
+		  (setf (tNFA--fragment-final (car fragment-stack)) new))
 		 ))
 
 
 	    ;; if next token is not a postfix operator, attach new fragment
 	    ;; onto end of current NFA fragment
-	    (tNFA-fragment-patch (car fragment-stack) fragment))
+	    (tNFA--fragment-patch (car fragment-stack) fragment))
 
 
 	  ;; if ending a group, add a maximize tag to end
 	  (when group-end-tag
-	    (setq new (tNFA-NFA-state-create)
-		  fragment (tNFA-fragment-create
-			    (tNFA-NFA-state-create-tag group-end-tag new)
+	    (setq new (tNFA--NFA-state-create)
+		  fragment (tNFA--fragment-create
+			    (tNFA--NFA-state-create-tag group-end-tag new)
 			    new))
 	    (push group-end-tag max-tags)
-	    (tNFA-fragment-patch (car fragment-stack) fragment)))
+	    (tNFA--fragment-patch (car fragment-stack) fragment)))
 	))  ; end of infinite loop and catch
     ))
 
 
 
-(defun NFA-regexp-next-token (regexp)
+(defun tNFA--regexp-next-token (regexp)
   ;; if regexp is empty, return null values for next token type, token and
   ;; remaining regexp
   (if (null regexp)
@@ -624,22 +641,24 @@ individual elements of STRING are identical. The default is `eq'."
 ;;; ================================================================
 ;;;                     tNFA evolution
 
-(defun tNFA-next-state (DFA-state chr pos)
+(defun tNFA-next-state (tNFA chr pos)
+  "Evolve tNFA according to CHR, which corresponds to position
+POS in a string."
   (let (state)
     ;; if there is a transition for character CHR...
     (cond
-     ((setq state (gethash chr (tNFA-DFA-state-transitions DFA-state)))
+     ((setq state (gethash chr (tNFA--DFA-state-transitions tNFA)))
       ;; if next state has not already been computed, do so
-      (unless (tNFA-DFA-state-p state)
-	(setq state (tNFA--DFA-next-state DFA-state chr pos nil))
-	(puthash chr state (tNFA-DFA-state-transitions DFA-state))))
+      (unless (tNFA--DFA-state-p state)
+	(setq state (tNFA--DFA-next-state tNFA chr pos nil))
+	(puthash chr state (tNFA--DFA-state-transitions tNFA))))
 
      ;; if there's a wildcard transition...
-     ((setq state (tNFA-DFA-state-wildcard DFA-state))
+     ((setq state (tNFA--DFA-state-wildcard tNFA))
       ;; if next state has not already been computed, do so
-      (unless (tNFA-DFA-state-p state)
-	(setq state (tNFA--DFA-next-state DFA-state chr pos t))
-	(setf (tNFA-DFA-state-wildcard DFA-state) state))))
+      (unless (tNFA--DFA-state-p state)
+	(setq state (tNFA--DFA-next-state tNFA chr pos t))
+	(setf (tNFA--DFA-state-wildcard tNFA) state))))
     state))
 
 
@@ -648,47 +667,46 @@ individual elements of STRING are identical. The default is `eq'."
   (let (state-list state)
     ;; add all states reached by a CHR transition from DFA-STATE to state list
     (if wildcard
-	(dolist (state (tNFA-DFA-state-list DFA-state))
-	  (when (or (eq (tNFA-state-type state) 'wildcard)
-		    (and (eq (tNFA-state-type state) 'neg-char-alt)
-			 (not (memq chr (tNFA-state-label state)))))
-	    (push (tNFA-state-create (tNFA-state-next state)
-				     (tNFA-tags-copy (tNFA-state-tags state)))
+	(dolist (state (tNFA--DFA-state-list DFA-state))
+	  (when (or (eq (tNFA--state-type state) 'wildcard)
+		    (and (eq (tNFA--state-type state) 'neg-char-alt)
+			 (not (memq chr (tNFA--state-label state)))))
+	    (push (tNFA--state-create (tNFA--state-next state)
+				     (tNFA-tags-copy (tNFA--state-tags state)))
 		  state-list)))
-      (dolist (state (tNFA-DFA-state-list DFA-state))
-	(when (or (and (eq (tNFA-state-type state) 'literal)
-		       (eq chr (tNFA-state-label state)))
-		  (and (eq (tNFA-state-type state) 'char-alt)
-		       (memq chr (tNFA-state-label state)))
-		  (and (eq (tNFA-state-type state) 'neg-char-alt)
-		       (not (memq chr (tNFA-state-label state))))
-		  (eq (tNFA-state-type state) 'wildcard))
-	  (push (tNFA-state-create (tNFA-state-next state)
-				   (tNFA-tags-copy (tNFA-state-tags state)))
+      (dolist (state (tNFA--DFA-state-list DFA-state))
+	(when (or (and (eq (tNFA--state-type state) 'literal)
+		       (eq chr (tNFA--state-label state)))
+		  (and (eq (tNFA--state-type state) 'char-alt)
+		       (memq chr (tNFA--state-label state)))
+		  (and (eq (tNFA--state-type state) 'neg-char-alt)
+		       (not (memq chr (tNFA--state-label state))))
+		  (eq (tNFA--state-type state) 'wildcard))
+	  (push (tNFA--state-create (tNFA--state-next state)
+				   (tNFA-tags-copy (tNFA--state-tags state)))
 		state-list))))
 
     ;; if state list is empty, return empty, failure DFA state
     (when state-list
       ;; otherwise, construct new DFA state and add it to the pool if it's not
       ;; already there
-      (setq state-list (tNFA-epsilon-boundary state-list (1+ pos)))
+      (setq state-list (tNFA--epsilon-boundary state-list (1+ pos)))
       (setq state
-	    (or (gethash state-list (tNFA-DFA-state-pool DFA-state))
-		(tNFA-DFA-state-create
+	    (or (gethash state-list (tNFA--DFA-state-pool DFA-state))
+		(tNFA--DFA-state-create
 		 state-list
-		 (tNFA-DFA-state-pool DFA-state)
+		 (tNFA--DFA-state-pool DFA-state)
 		 :test
-		 (hash-table-test (tNFA-DFA-state-transitions DFA-state)))))
+		 (hash-table-test (tNFA--DFA-state-transitions DFA-state)))))
       ;; return next state
       state)))
 
 
 
-(defun tNFA-epsilon-boundary (state-set pos)
-  ;; Return the tagged epsilon-closure of the tNFA states listed in STATE-SET,
-  ;; that is the set of all states that can be reached via only epsilon
-  ;; transitions from some state in STATE-SET. (This includes all states in
-  ;; STATE-SET itself.)
+(defun tNFA--epsilon-boundary (state-set pos)
+  ;; Return the tagged epsilon-boundary of the NFA states listed in STATE-SET,
+  ;; that is the set of all states that can be reached via epsilon transitions
+  ;; from some state in STATE-SET (not including those in STATE-SET).
   (let ((queue (queue-create))
 	(result '())
 	(reset '())
@@ -696,72 +714,72 @@ individual elements of STRING are identical. The default is `eq'."
     ;; temporarily link the NFA states to their corresponding tNFA states, and
     ;; add them to the queue
     (dolist (t-state state-set)
-      (setf state (tNFA-state-NFA-state t-state)
-	    (tNFA-NFA-state-tNFA-state state) t-state)
+      (setf state (tNFA--state-NFA-state t-state)
+	    (tNFA--NFA-state-tNFA-state state) t-state)
       (push state reset)
       (queue-enqueue queue state))
 
     (while (setq state (queue-dequeue queue))
       (cond
        ;; branch or epsilon: add next states as necessary, copying tags across
-       ((or (eq (tNFA-NFA-state-type state) 'branch)
-	    (eq (tNFA-NFA-state-type state) 'epsilon))
-	(dolist (next (if (eq (tNFA-NFA-state-type state) 'epsilon)
-			  (list (tNFA-NFA-state-next state))
-			(tNFA-NFA-state-next state)))
-	  (unless (tNFA-NFA-state-tNFA-state next)
-	    (setf (tNFA-NFA-state-tNFA-state next)
-		  (tNFA-state-create
-		   next (tNFA-tags-copy (tNFA-NFA-state-tags state))))
+       ((or (eq (tNFA--NFA-state-type state) 'branch)
+	    (eq (tNFA--NFA-state-type state) 'epsilon))
+	(dolist (next (if (eq (tNFA--NFA-state-type state) 'epsilon)
+			  (list (tNFA--NFA-state-next state))
+			(tNFA--NFA-state-next state)))
+	  (unless (tNFA--NFA-state-tNFA-state next)
+	    (setf (tNFA--NFA-state-tNFA-state next)
+		  (tNFA--state-create
+		   next (tNFA-tags-copy (tNFA--NFA-state-tags state))))
 	    (push next reset)
 	    ;; if next state hasn't already been seen in-degree times, add it
 	    ;; to the end of the queue
-	    (if (/= (decf (tNFA-NFA-state-count next)) 0)
+	    (if (/= (decf (tNFA--NFA-state-count next)) 0)
 		(queue-enqueue queue next)
 	      ;; if it has now been seen in-degree times, reset count and add
 	      ;; it back to the front of the queue
-	      (setf (tNFA-NFA-state-count next)
-		    (tNFA-NFA-state-in-degree next))
+	      (setf (tNFA--NFA-state-count next)
+		    (tNFA--NFA-state-in-degree next))
 	      (queue-prepend queue next)))))
 
        ;; tag: add next state if necessary, updating tags if necessary
-       ((eq (tNFA-NFA-state-type state) 'tag)
-	(setq next (tNFA-NFA-state-next state))
+       ((eq (tNFA--NFA-state-type state) 'tag)
+	(setq next (tNFA--NFA-state-next state))
 	;; if next state is not already in results list, or it is already in
 	;; results but new tag value takes precedence...
-	(when (or (not (tNFA-NFA-state-tNFA-state next))
-		  (tNFA-tags< pos (tNFA-NFA-state-tag state)
-			      (tNFA-NFA-state-tags next)))
+	(when (or (not (tNFA--NFA-state-tNFA-state next))
+		  (tNFA-tags< pos (tNFA--NFA-state-tag state)
+			      (tNFA--NFA-state-tags next)))
 	  ;; if next state is already in results, update tag value
-	  (if (tNFA-NFA-state-tNFA-state next)
-	      (tNFA-tags-set (tNFA-NFA-state-tags next)
-			     (tNFA-NFA-state-tag state) pos)
+	  (if (tNFA--NFA-state-tNFA-state next)
+	      (tNFA-tags-set (tNFA--NFA-state-tags next)
+			     (tNFA--NFA-state-tag state) pos)
 	    ;; if state is not already in results, copy tags, updating tag
 	    ;; value, and add next state to results list
-	    (setq tags (tNFA-tags-copy (tNFA-NFA-state-tags state)))
-	    (tNFA-tags-set tags (tNFA-NFA-state-tag state) pos)
-	    (setf (tNFA-NFA-state-tNFA-state next)
-		  (tNFA-state-create next tags))
+	    (setq tags (tNFA-tags-copy (tNFA--NFA-state-tags state)))
+	    (tNFA-tags-set tags (tNFA--NFA-state-tag state) pos)
+	    (setf (tNFA--NFA-state-tNFA-state next)
+		  (tNFA--state-create next tags))
 	    (push next reset))
 	  ;; if next state hasn't already been seen in-degree times, add it to
 	  ;; the end of the queue
-	  (if (/= (decf (tNFA-NFA-state-count next)) 0)
+	  (if (/= (decf (tNFA--NFA-state-count next)) 0)
 	      (queue-enqueue queue next)
 	    ;; if it has now been seen in-degree times, reset count and add it
 	    ;; back to the front of the queue
-	    (setf (tNFA-NFA-state-count next) (tNFA-NFA-state-in-degree next))
+	    (setf (tNFA--NFA-state-count next) (tNFA--NFA-state-in-degree next))
 	    (queue-prepend queue next))))
 
        ;; anything else is a non-epsilon-transition state, so add it to result
-       (t (push (tNFA-NFA-state-tNFA-state state) result))
+       (t (push (tNFA--NFA-state-tNFA-state state) result))
        ))
 
     ;; reset temporary NFA state link and count
     (dolist (state reset)
-      (setf (tNFA-NFA-state-tNFA-state state) nil
-	    (tNFA-NFA-state-count state) (tNFA-NFA-state-in-degree state)))
+      (setf (tNFA--NFA-state-tNFA-state state) nil
+	    (tNFA--NFA-state-count state) (tNFA--NFA-state-in-degree state)))
     ;; sort result states
-    (sort result (lambda (a b) (< (tNFA-state-id a) (tNFA-state-id b))))
+    (sort result (lambda (a b) (< (tNFA--state-id a) (tNFA--state-id b))))
     ))
 
 
@@ -787,7 +805,7 @@ individual elements of STRING are identical. The default is `eq'."
 	  (throw 'fail nil)))
 
       ;; if REGEXP matched...
-      (when (setq tags (tNFA-DFA-state-match tNFA))
+      (when (setq tags (tNFA--DFA-state-match tNFA))
 	(setq match-data (make-list (+ (length tags) 2) nil))
 	;; set match data
 	(setf (nth 0 match-data) 0
@@ -805,6 +823,12 @@ individual elements of STRING are identical. The default is `eq'."
 		    (tNFA-tags-get tags i)))))
 	(set-match-data match-data)
 	tags))))
+
+
+(defun tNFA-group-data (tNFA)
+  "Return the group match data associated with a tNFA state."
+  (tNFA--tags-to-groups (tNFA--DFA-state-match tNFA)))
+
 
 
 ;;; tNFA.el ends here
