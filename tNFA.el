@@ -148,19 +148,20 @@
 
 (defun tNFA--NFA-state-patch (attach state)
   ;; patch STATE onto ATTACH. Return value is meaningless
-  (setf (tNFA--NFA-state-type attach)  (tNFA--NFA-state-type state)
-	(tNFA--NFA-state-label attach) (tNFA--NFA-state-label state)
-	(tNFA--NFA-state-next attach)  (tNFA--NFA-state-next state)
-	(tNFA--NFA-state-count state)  (incf (tNFA--NFA-state-in-degree state))
-	))
+  (setf
+   (tNFA--NFA-state-type attach)  (tNFA--NFA-state-type state)
+   (tNFA--NFA-state-label attach) (tNFA--NFA-state-label state)
+   (tNFA--NFA-state-next attach)  (tNFA--NFA-state-next state)
+   (tNFA--NFA-state-count state)  (incf (tNFA--NFA-state-in-degree state))))
 
 
 (defun tNFA--NFA-state-make-epsilon (state next)
   ;; create an epsilon transition from STATE to NEXT
-  (setf (tNFA--NFA-state-type state)  'epsilon
-	(tNFA--NFA-state-label state) nil
-	(tNFA--NFA-state-next state)  next
-	(tNFA--NFA-state-count next)  (incf (tNFA--NFA-state-in-degree next))))
+  (setf
+   (tNFA--NFA-state-type state)  'epsilon
+   (tNFA--NFA-state-label state) nil
+   (tNFA--NFA-state-next state)  next
+   (tNFA--NFA-state-count next)  (incf (tNFA--NFA-state-in-degree next))))
 
 
 (defun tNFA--NFA-state-make-branch (state next)
@@ -170,6 +171,16 @@
 	(tNFA--NFA-state-next state)  next)
   (dolist (n next)
     (setf (tNFA--NFA-state-count n) (incf (tNFA--NFA-state-in-degree n)))))
+
+
+(defun tNFA--NFA-state-copy (state)
+  ;; Return a copy of STATE. The next link is *not* copied, it is `eq' to the
+  ;; original next link. Use `tNFA--fragment-copy' if you want to recursively
+  ;; copy a chain of states. Note: NFA--state-id must be bound to something
+  ;; appropriate when this function is called.
+  (let ((copy (copy-sequence state)))
+    (setf (tNFA--NFA-state-id copy) (incf NFA--state-id))
+    copy))
 
 
 
@@ -190,6 +201,47 @@
   (tNFA--NFA-state-patch (tNFA--fragment-final frag1)
 			(tNFA--fragment-initial frag2))
   (setf (tNFA--fragment-final frag1) (tNFA--fragment-final frag2)))
+
+
+(defun tNFA--fragment-copy (fragment)
+  ;; return a copy of FRAGMENT.
+  (declare (special copied-states))
+  (let (copied-states)
+    (tNFA--fragment-create
+     (tNFA--do-fragment-copy (tNFA--fragment-initial fragment))
+     (cdr (assq (tNFA--fragment-final fragment) copied-states)))))
+
+
+(defun tNFA--do-fragment-copy (state)
+  ;; return a copy of STATE, recursively following and copying links
+  ;; (note: NFA--state-id must be bound to something appropriate when this is
+  ;; called)
+  (declare (special copied-states))
+  (let ((copy (tNFA--NFA-state-copy state)))
+    (push (cons state copy) copied-states)
+
+    ;; if STATE is a branch, copy all links
+    (cond
+     ((eq (tNFA--NFA-state-type copy) 'branch)
+      (setf (tNFA--NFA-state-next copy)
+	    (mapcar (lambda (next)
+		      (or (cdr (assq next copied-states))
+			  (tNFA--do-fragment-copy next)))
+		    (tNFA--NFA-state-next copy))))
+
+     ;; if state doesn't have a next link, return
+     ((or (eq (tNFA--NFA-state-type copy) 'match)
+	  (null (tNFA--NFA-state-type copy))))
+
+     ;; otherwise, copy next link
+     ((tNFA--NFA-state-type copy)
+      ;; for a non-branch STATE, copy next link
+      (setf (tNFA--NFA-state-next copy)
+	    ;; if we've already copied next state, set next link to that
+	    (or (cdr (assq (tNFA--NFA-state-next copy) copied-states))
+		;; otherwise, recursively copy next state
+		(tNFA--do-fragment-copy (tNFA--NFA-state-next copy))))))
+    copy))
 
 
 
@@ -371,6 +423,15 @@ individual elements of STRING are identical. The default is `eq'."
       )))
 
 
+(defmacro tNFA--regexp-postfix-p (regexp)
+  ;; return t if next token in REGEXP is a postfix operator, nil otherwise
+  `(or (eq (car ,regexp) ?*)
+       (eq (car ,regexp) ?+)
+       (eq (car ,regexp) ??)
+       (and (eq (car ,regexp) ?\\)
+	    (cdr ,regexp)
+	    (eq (cadr ,regexp) ?{))))
+
 
 (defun tNFA--from-regexp (regexp num-tags min-tags max-tags
 				 &optional top-level shy-group)
@@ -387,7 +448,7 @@ individual elements of STRING are identical. The default is `eq'."
 
   (let* ((new (tNFA--NFA-state-create))
 	 (fragment-stack (list (tNFA--fragment-create new new)))
-	 fragment attach token type group-end-tag)
+	 fragment copy attach token type group-end-tag)
 
     (catch 'constructed
       (while t
@@ -513,67 +574,92 @@ individual elements of STRING are identical. The default is `eq'."
 
 	;; ----- attach new fragment -----
 	(when fragment
-	  (setq attach (tNFA--fragment-final (car fragment-stack)))
-	  (if (or (eq (car regexp) ?*)
-		  (eq (car regexp) ?+)
-		  (eq (car regexp) ??))
-	      (if (eq type 'alternation)
-		  (error "Syntax error in regexp: unexpected \"%s\""
-			 (char-to-string token))
+	  ;; if next token is not a postfix operator, attach new fragment onto
+	  ;; end of current NFA fragment
+	  (if (not (tNFA--regexp-postfix-p regexp))
+	      (tNFA--fragment-patch (car fragment-stack) fragment)
 
-		;; if next token is a postfix operator, splice new fragment
-		;; into NFA as appropriate
-		(setq regexp (tNFA--regexp-next-token regexp)
-		      type   (nth 0 regexp)
-		      token  (nth 1 regexp)
-		      regexp (nth 2 regexp))
-		(setq new (tNFA--NFA-state-create))
+	    ;; if next token is a postfix operator, splice new fragment into
+	    ;; NFA as appropriate
+	    (when (eq type 'alternation)
+	      (error "Syntax error in regexp: unexpected \"%s\""
+		     (char-to-string token)))
+	    (setq regexp (tNFA--regexp-next-token regexp)
+		  type   (nth 0 regexp)
+		  token  (nth 1 regexp)
+		  regexp (nth 2 regexp))
 
-		(cond
+	    (while fragment
+	      (setq attach (tNFA--fragment-final (car fragment-stack)))
+	      (setq new (tNFA--NFA-state-create))
+	      (cond
 
-		 ;;    .--fragment--.
-		 ;;   /              \
-		 ;;   \        ______/
-		 ;;    \      /
-		 ;;  ---attach-----new---
-		 ;;
-		 ((eq type 'postfix*)
-		  (tNFA--NFA-state-make-branch
-		   attach (list (tNFA--fragment-initial fragment) new))
-		  (tNFA--NFA-state-make-epsilon
-		   (tNFA--fragment-final fragment) attach)
-		  (setf (tNFA--fragment-final (car fragment-stack)) new))
+	       ;; * postfix = \{0,\}:
+	       ;;
+	       ;;    .--fragment--.
+	       ;;   /              \
+	       ;;   \        ______/
+	       ;;    \      /
+	       ;;  ---attach-----new---
+	       ;;
+	       ((and (eq (car token) 0) (null (cdr token)))
+		(tNFA--NFA-state-make-branch
+		 attach (list (tNFA--fragment-initial fragment) new))
+		(tNFA--NFA-state-make-epsilon
+		 (tNFA--fragment-final fragment) attach)
+		(setf (tNFA--fragment-final (car fragment-stack)) new)
+		(setq fragment nil))
 
-		 ;;      .----.
-		 ;;     /      \
-		 ;;    /        \
-		 ;;    \        /
-		 ;;  ---fragment-----new---
-		 ;;
-		 ((eq type 'postfix+)
-		  (tNFA--NFA-state-patch
-		   attach (tNFA--fragment-initial fragment))
-		  (tNFA--NFA-state-make-branch
-		   (tNFA--fragment-final fragment) (list attach new))
-		  (setf (tNFA--fragment-final (car fragment-stack)) new))
+	       ;; + postfix = \{1,\}:
+	       ;;
+	       ;;      .----.
+	       ;;     /      \
+	       ;;    /        \
+	       ;;    \        /
+	       ;;  ---fragment-----new---
+	       ;;
+	       ((and (eq (car token) 1) (null (cdr token)))
+		(tNFA--NFA-state-patch
+		 attach (tNFA--fragment-initial fragment))
+		(tNFA--NFA-state-make-branch
+		 (tNFA--fragment-final fragment) (list attach new))
+		(setf (tNFA--fragment-final (car fragment-stack)) new)
+		(setq fragment nil))
 
-		 ;;            .--fragment--.
-		 ;;           /              \
-		 ;;  ---attach                new---
-		 ;;           \______________/
-		 ;;
-		 ((eq type 'postfix?)
-		  (tNFA--NFA-state-make-branch
-		   attach (list (tNFA--fragment-initial fragment) new))
-		  (tNFA--NFA-state-make-epsilon
-		   (tNFA--fragment-final fragment) new)
-		  (setf (tNFA--fragment-final (car fragment-stack)) new))
-		 ))
+	       ;; \{0,n\} (note: ? postfix = \{0,1\}):
+	       ;;
+	       ;;            .--fragment--.
+	       ;;           /              \
+	       ;;  ---attach                new---
+	       ;;           \______________/
+	       ;;
+	       ((eq (car token) 0)
+		;; ? postfix = \{0,1\}: after this we're done
+		(if (eq (cdr token) 1)
+		    (setq copy nil)
+		  (setq copy (tNFA--fragment-copy fragment)))
+		;; attach fragment
+		(tNFA--NFA-state-make-branch
+		 attach (list (tNFA--fragment-initial fragment) new))
+		(tNFA--NFA-state-make-epsilon
+		 (tNFA--fragment-final fragment) new)
+		(setf (tNFA--fragment-final (car fragment-stack)) new)
+		;; prepare for next iteration
+		(decf (cdr token))
+		(setq fragment copy))
 
-
-	    ;; if next token is not a postfix operator, attach new fragment
-	    ;; onto end of current NFA fragment
-	    (tNFA--fragment-patch (car fragment-stack) fragment))
+	       ;; \{n,\} or \{n,m\}:
+	       ;;
+	       ;;  ---attach----fragment----new---
+	       ;;
+	       (t
+		(setq copy (tNFA--fragment-copy fragment))
+		(tNFA--fragment-patch (car fragment-stack) fragment)
+		;; prepare for next iteration
+		(decf (car token))
+		(when (cdr token) (decf (cdr token)))
+		(setq fragment copy))
+	       )))
 
 
 	  ;; if ending a group, add a maximize tag to end
@@ -626,9 +712,9 @@ individual elements of STRING are identical. The default is `eq'."
 	(error "Syntax error in regexp: missing \"[\""))
 
        ;; . * + ?: set appropriate type
-       ((eq token ?*) (setq type 'postfix*))
-       ((eq token ?+) (setq type 'postfix+))
-       ((eq token ??) (setq type 'postfix?))
+       ((eq token ?*) (setq type 'postfix token (cons 0 nil)))
+       ((eq token ?+) (setq type 'postfix token (cons 1 nil)))
+       ((eq token ??) (setq type 'postfix token (cons 0 1)))
        ((eq token ?.) (setq type 'wildcard))
 
        ;; \: look at next character
@@ -636,15 +722,61 @@ individual elements of STRING are identical. The default is `eq'."
 	(unless (setq token (pop regexp))
 	  (error "Syntax error in regexp: missing character after \"\\\""))
 	(cond
+	 ;; |: alternation
 	 ((eq token ?|) (setq type 'alternation))
+	 ;; \(?: shy group start
 	 ((and (eq token ?\() (eq (car regexp) ??))
 	  (setq type 'shy-group-start)
 	  (pop regexp))
+	 ;; \)?: shy group end
 	 ((and (eq token ?\)) (eq (car regexp) ??))
 	  (setq type 'shy-group-end)
 	  (pop regexp))
+	 ;; \(: group start
 	 ((eq token ?\() (setq type 'group-start))
-	 ((eq token ?\)) (setq type 'group-end))))
+	 ;; \): group end
+	 ((eq token ?\)) (setq type 'group-end))
+
+	 ;; \{: postfix repetition operator
+	 ((eq token ?{)
+	  (setq type 'postfix token (cons nil nil))
+	  ;; extract first number from repetition operator
+	  (while (if (null regexp)
+		     (error "Syntax error in regexp: malformed \\{...\\}")
+		   (not (or (eq (car regexp) ?,) (eq (car regexp) ?\\))))
+	    (setcar token (concat (car token) (char-to-string (pop regexp)))))
+	  (if (null (car token))
+	      (setcar token 0)
+	    (unless (string-match "[0-9]+" (car token))
+	      (error "Syntax error in regexp: malformed \\{...\\}"))
+	    (setcar token (string-to-number (car token))))
+	  (cond
+	   ;; if next character is "\", we expect "}" to follow
+	   ((eq (car regexp) ?\\)
+	    (pop regexp)
+	    (unless (eq (car regexp) ?})
+	      (error "Syntax error in regexp: expected \"}\""))
+	    (pop regexp)
+	    (unless (car token)
+	      (error "Syntax error in regexp: malformed \\{...\\}"))
+	    (setcdr token (car token)))
+	   ;; if next character is ",", we expect a second number to follow
+	   ((eq (car regexp) ?,)
+	    (pop regexp)
+	    (while (if (null regexp)
+		       (error "Syntax error in regexp: malformed \\{...\\}")
+		     (not (eq (car regexp) ?\\)))
+	      (setcdr token
+		      (concat (cdr token) (char-to-string (pop regexp)))))
+	    (unless (null (cdr token))
+	      (unless (string-match "[0-9]+" (cdr token))
+	 	(error "Syntax error in regexp: malformed \\{...\\}"))
+	      (setcdr token (string-to-number (cdr token))))
+	    (pop regexp)
+	    (unless (eq (car regexp) ?})
+	      (error "Syntax error in regexp: expected \"}\""))
+	    (pop regexp))))
+	 ))
        )
 
       ;; return first token type, token, and remaining regexp
