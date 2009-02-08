@@ -478,7 +478,7 @@ individual elements of STRING are identical. The default is `eq'."
 	  (error "Syntax error in regexp: \"(?\" matched with \")\""))
 
 	 ;; syntax error: postfix operator not after atom
-	 ((or (eq type 'postfix*) (eq type 'postfix+) (eq type 'postfix?))
+	 ((eq type 'postfix)
 	  (error "Syntax error in regexp: unexpected \"%s\""
 		 (char-to-string token)))
 
@@ -658,7 +658,9 @@ individual elements of STRING are identical. The default is `eq'."
 		;; prepare for next iteration
 		(decf (car token))
 		(when (cdr token) (decf (cdr token)))
-		(setq fragment copy))
+		(if (eq (cdr token) 0)
+		    (setq fragment nil)
+		  (setq fragment copy)))
 	       )))
 
 
