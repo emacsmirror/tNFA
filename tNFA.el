@@ -30,6 +30,42 @@
 
 ;;; Commentary:
 ;;
+;; A tagged, non-deterministic finite state automata (NFA) is an abstract
+;; computing machine that recognises regular languages. In layman's terms,
+;; they are used to decide whether a string matches a regular expression. The
+;; "tagged" part means that the NFA can do group-capture: it returns
+;; information about which parts of a string matched which subgroup of the
+;; regular expression.
+;;
+;; Why re-implement regular expression matching when Emacs comes with
+;; extensive built-in support for regexps? Primarily, because some algorithms
+;; require access to the NFA states produced part way through the regular
+;; expression matching process (see `tries.el' for an example). Secondarily,
+;; because Emacs regexps only work on strings, whereas regular expressions can
+;; equally well be used to specify other sequence types.
+;;
+;; A tagged NFA can be created from a regular expression using
+;; `tNFA-from-regexp', and it's state can be updated using
+;; `tNFA-next-state'. You can discover whether a state is a matching state
+;; using `tNFA-match-p', extract subgroup capture data from it using
+;; `tNFA-group-data', check whether a state has any wildcard transitions using
+;; `tNFA-wildcard-p', and get a list of non-wildcard transitions using
+;; `tNFA-transitions'. Finally, `tNFA-regexp-match' uses tagged NFAs to decide
+;; whether a regexp matches a given string.
+;;
+;; Note that Emacs' regexps are not regular expressions in the original
+;; meaning of that phrase. Emacs regexps implement additional features (in
+;; particular, back-references) that allow them to match far more than just
+;; regular languages. This comes at a cost: regexp matching can potentially be
+;; very slow (NP-hard, though the hard cases rarely crop up in practise),
+;; whereas there are efficient (polynomial-time) algorithms for matching
+;; regular expressions (in the original sense). Therefore, this package only
+;; supports a subset of the full Emacs regular expression syntax. See the
+;; function docstrings for more information.
+;;
+;; This package essentially implements Laurikari's algorithm, as described in
+;; his master's thesis, but it builds the corresponding tagged deterministic
+;; finite state automaton (DFA) on-the-fly as needed.
 
 
 ;;; Change Log:
@@ -72,7 +108,7 @@
    (:constructor nil)
    (:constructor tNFA--state-create-initial
 		 (NFA-state num-tags min-tags max-tags
-		  &aux (tags (tNFA-tags-create num-tags min-tags max-tags))))
+		  &aux (tags (tNFA--tags-create num-tags min-tags max-tags))))
    (:constructor tNFA--state-create (NFA-state tags))
    (:copier nil))
   NFA-state tags)
@@ -323,7 +359,7 @@
 ;;; ----------------------------------------------------------------
 ;;;                      tag tables
 
-(defun tNFA-tags-create (num-tags min-tags max-tags)
+(defun tNFA--tags-create (num-tags min-tags max-tags)
   ;; construct a new tags table
   (let ((vec (make-vector num-tags nil)))
     (dolist (tag min-tags)
@@ -333,7 +369,7 @@
     vec))
 
 
-(defun tNFA-tags-copy (tags)
+(defun tNFA--tags-copy (tags)
   ;; return a copy of TAGS table
   (let* ((len (length tags))
 	 (vec (make-vector len nil)))
@@ -343,22 +379,22 @@
     vec))
 
 
-(defmacro tNFA-tags-set (tags tag val)
+(defmacro tNFA--tags-set (tags tag val)
   ;; set value of TAG in TAGS table to VAL
   `(setcar (aref ,tags ,tag) ,val))
 
 
-(defmacro tNFA-tags-get (tags tag)
+(defmacro tNFA--tags-get (tags tag)
   ;; get value of TAG in TAGS table
   `(car (aref ,tags ,tag)))
 
 
-(defmacro tNFA-tags-type (tags tag)
+(defmacro tNFA--tags-type (tags tag)
   ;; return tag type ('min or 'max)
   `(cdr (aref ,tags ,tag)))
 
 
-(defun tNFA-tags< (val tag tags)
+(defun tNFA--tags< (val tag tags)
   ;; return non-nil if VAL takes precedence over the value of TAG in TAGS
   ;; table, nil otherwise
   (setq tag (aref tags tag))
@@ -378,12 +414,12 @@
 	group-stack
 	(grp 0))
     (dotimes (i (length tags))
-      (if (eq (tNFA-tags-type tags i) 'max)
-	  (unless (= (tNFA-tags-get tags i) -1)
+      (if (eq (tNFA--tags-type tags i) 'max)
+	  (unless (= (tNFA--tags-get tags i) -1)
 	    (setf (nth (caar group-stack) groups)
-		  (cons (cdr (pop group-stack)) (tNFA-tags-get tags i))))
-	(unless (= (tNFA-tags-get tags i) -1)
-	  (push (cons grp (tNFA-tags-get tags i)) group-stack))
+		  (cons (cdr (pop group-stack)) (tNFA--tags-get tags i))))
+	(unless (= (tNFA--tags-get tags i) -1)
+	  (push (cons grp (tNFA--tags-get tags i)) group-stack))
 	(incf grp)))
     groups))
 
@@ -831,7 +867,7 @@ POS in a string."
 		    (and (eq (tNFA--state-type state) 'neg-char-alt)
 			 (not (memq chr (tNFA--state-label state)))))
 	    (push (tNFA--state-create (tNFA--state-next state)
-				     (tNFA-tags-copy (tNFA--state-tags state)))
+				     (tNFA--tags-copy (tNFA--state-tags state)))
 		  state-list)))
       (dolist (state (tNFA--DFA-state-list DFA-state))
 	(when (or (and (eq (tNFA--state-type state) 'literal)
@@ -842,7 +878,7 @@ POS in a string."
 		       (not (memq chr (tNFA--state-label state))))
 		  (eq (tNFA--state-type state) 'wildcard))
 	  (push (tNFA--state-create (tNFA--state-next state)
-				   (tNFA-tags-copy (tNFA--state-tags state)))
+				   (tNFA--tags-copy (tNFA--state-tags state)))
 		state-list))))
 
     ;; if state list is empty, return empty, failure DFA state
@@ -888,7 +924,7 @@ POS in a string."
 	  (unless (tNFA--NFA-state-tNFA-state next)
 	    (setf (tNFA--NFA-state-tNFA-state next)
 		  (tNFA--state-create
-		   next (tNFA-tags-copy (tNFA--NFA-state-tags state))))
+		   next (tNFA--tags-copy (tNFA--NFA-state-tags state))))
 	    (push next reset)
 	    ;; if next state hasn't already been seen in-degree times, add it
 	    ;; to the end of the queue
@@ -906,16 +942,16 @@ POS in a string."
 	;; if next state is not already in results list, or it is already in
 	;; results but new tag value takes precedence...
 	(when (or (not (tNFA--NFA-state-tNFA-state next))
-		  (tNFA-tags< pos (tNFA--NFA-state-tag state)
+		  (tNFA--tags< pos (tNFA--NFA-state-tag state)
 			      (tNFA--NFA-state-tags next)))
 	  ;; if next state is already in results, update tag value
 	  (if (tNFA--NFA-state-tNFA-state next)
-	      (tNFA-tags-set (tNFA--NFA-state-tags next)
+	      (tNFA--tags-set (tNFA--NFA-state-tags next)
 			     (tNFA--NFA-state-tag state) pos)
 	    ;; if state is not already in results, copy tags, updating tag
 	    ;; value, and add next state to results list
-	    (setq tags (tNFA-tags-copy (tNFA--NFA-state-tags state)))
-	    (tNFA-tags-set tags (tNFA--NFA-state-tag state) pos)
+	    (setq tags (tNFA--tags-copy (tNFA--NFA-state-tags state)))
+	    (tNFA--tags-set tags (tNFA--NFA-state-tag state) pos)
 	    (setf (tNFA--NFA-state-tNFA-state next)
 		  (tNFA--state-create next tags))
 	    (push next reset))
@@ -985,15 +1021,15 @@ beginning and end of the regexp to get an unanchored match)."
 	      (nth 1 match-data) (length string))
 	;; set group match data if there were any groups
 	(dotimes (i (length tags))
-	  (if (eq (tNFA-tags-type tags i) 'max)
-	      (unless (= (tNFA-tags-get tags i) -1)
+	  (if (eq (tNFA--tags-type tags i) 'max)
+	      (unless (= (tNFA--tags-get tags i) -1)
 		(setf (nth (1+ (* 2 (pop group-stack))) match-data)
-		      (tNFA-tags-get tags i)))
+		      (tNFA--tags-get tags i)))
 	    (incf grp)
-	    (unless (= (tNFA-tags-get tags i) -1)
+	    (unless (= (tNFA--tags-get tags i) -1)
 	      (push grp group-stack)
 	      (setf (nth (* 2 grp) match-data)
-		    (tNFA-tags-get tags i)))))
+		    (tNFA--tags-get tags i)))))
 	(set-match-data match-data)
 	tags))))
 
