@@ -40,7 +40,7 @@
 ;; Why re-implement regular expression matching when Emacs comes with
 ;; extensive built-in support for regexps? Primarily, because some
 ;; algorithms require access to the NFA states produced part way through
-;; the regular expression matching process (see `tries.el' for an
+;; the regular expression matching process (see `trie.el' for an
 ;; example). Secondarily, because Emacs regexps only work on strings,
 ;; whereas regular expressions can equally well be used to specify other
 ;; sequence types.
@@ -167,7 +167,7 @@
 		 (tag &optional next
 		  &aux
 		  (type 'tag)
-		  (label (progn (message "%d" tag) tag))
+		  (label tag)
 		  (in-degree 0)
 		  (count 0)
 		  (id (incf NFA--state-id))
