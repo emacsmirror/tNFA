@@ -146,16 +146,17 @@
   (tNFA--NFA-state
    (:type vector)
    (:constructor nil)
-   (:constructor tNFA--NFA-state-create
+   (:constructor tNFA---NFA-state-create
 		 (&optional type label next
 		  &aux
 		  (in-degree 0)
 		  (count 0)
 		  (id (incf NFA--state-id))
-		  (dummy
-		   (when next
-		     (setf (tNFA--NFA-state-count next)
-			   (incf (tNFA--NFA-state-in-degree next)))))))
+		  ;; (dummy
+		  ;;  (when next
+		  ;;    (setf (tNFA--NFA-state-count next)
+		  ;; 	   (incf (tNFA--NFA-state-in-degree next)))))
+		  ))
    (:constructor tNFA--NFA-state-create-branch
 		 (&rest next
 		  &aux
@@ -163,7 +164,7 @@
 		  (in-degree 0)
 		  (count 0)
 		  (id (incf NFA--state-id))))
-   (:constructor tNFA--NFA-state-create-tag
+   (:constructor tNFA---NFA-state-create-tag
 		 (tag &optional next
 		  &aux
 		  (type 'tag)
@@ -171,14 +172,31 @@
 		  (in-degree 0)
 		  (count 0)
 		  (id (incf NFA--state-id))
-		  (dummy
-		   (when next
-		     (setf (tNFA--NFA-state-count next)
-			   (incf (tNFA--NFA-state-in-degree next)))))))
+		  ;; (dummy
+		  ;;  (when next
+		  ;;    (setf (tNFA--NFA-state-count next)
+		  ;; 	   (incf (tNFA--NFA-state-in-degree next)))))
+		  ))
    (:copier nil))
   id type label in-degree
   count tNFA-state  ; used internally in NFA evolution algorithms
   next)
+
+
+;; Define these via defun instead of using the dummy argument in the
+;; above defstruct to work around a mysterious byte-compiler bug.
+
+(defun tNFA--NFA-state-create (&optional type label next)
+  (when next
+    (setf (tNFA--NFA-state-count next)
+	  (incf (tNFA--NFA-state-in-degree next))))
+    (tNFA---NFA-state-create type label next))
+
+(defun tNFA--NFA-state-create-tag (tag &optional next)
+  (when next
+    (setf (tNFA--NFA-state-count next)
+	  (incf (tNFA--NFA-state-in-degree next))))
+    (tNFA---NFA-state-create-tag tag next))
 
 
 ;; tag number for a tagged epsilon transition is stored in label slot
