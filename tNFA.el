@@ -2,10 +2,10 @@
 ;;; tNFA.el --- tagged non-deterministic finite-state automata package
 
 
-;; Copyright (C) 2008-2009 Toby Cubitt
+;; Copyright (C) 2008-2010 Toby Cubitt
 
 ;; Author: Toby Cubitt <toby-predictive@dr-qubit.org>
-;; Version: 0.1
+;; Version: 0.1.1
 ;; Keywords: TNFA, NFA, tagged, non-deterministic, finite state, automata
 ;; URL: http://www.dr-qubit.org/emacs.php
 
@@ -72,6 +72,10 @@
 
 
 ;;; Change Log:
+;; Version 0.1.1
+;; * work-around mysterious byte-compiler bug by defining
+;;   `tNFA--NFA-state-create' and `tNFA--NFA-state-create-tag' via
+;;   `defun' instead of directly in `defcustom'
 ;;
 ;; Version 0.1
 ;; * initial version
