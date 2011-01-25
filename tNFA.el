@@ -75,7 +75,7 @@
 ;; Version 0.1.1
 ;; * work-around mysterious byte-compiler bug by defining
 ;;   `tNFA--NFA-state-create' and `tNFA--NFA-state-create-tag' via
-;;   `defun' instead of directly in `defcustom'
+;;   `defun' instead of directly in `defstruct'
 ;;
 ;; Version 0.1
 ;; * initial version
