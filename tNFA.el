@@ -1,12 +1,14 @@
 
-;;; tNFA.el --- tagged non-deterministic finite-state automata package
+;;; tNFA.el --- tagged non-deterministic finite-state automata
 
 
-;; Copyright (C) 2008-2010 Toby Cubitt
+;; Copyright (C) 2008-2010, 2012 Toby Cubitt
 
 ;; Author: Toby Cubitt <toby-predictive@dr-qubit.org>
 ;; Version: 0.1.1
-;; Keywords: TNFA, NFA, tagged, non-deterministic, finite state, automata
+;; Keywords: extensions, matching, data structures
+;;           tNFA, NFA, DFA, finite state automata, automata, regexp
+;; Package-Requires: ((queue "0.1"))
 ;; URL: http://www.dr-qubit.org/emacs.php
 
 
@@ -33,20 +35,20 @@
 ;; A tagged, non-deterministic finite state automata (NFA) is an
 ;; abstract computing machine that recognises regular languages. In
 ;; layman's terms, they are used to decide whether a string matches a
-;; regular expression. The "tagged" part means that the NFA can do
+;; regular expression. The "tagged" part allows the NFA to do
 ;; group-capture: it returns information about which parts of a string
 ;; matched which subgroup of the regular expression.
 ;;
 ;; Why re-implement regular expression matching when Emacs comes with
 ;; extensive built-in support for regexps? Primarily, because some
 ;; algorithms require access to the NFA states produced part way through
-;; the regular expression matching process (see `trie.el' for an
-;; example). Secondarily, because Emacs regexps only work on strings,
-;; whereas regular expressions can equally well be used to specify other
-;; sequence types.
+;; the regular expression matching process (see the trie.el package for
+;; an example). Secondarily, because Emacs regexps only work on strings,
+;; whereas regular expressions can usefully be used in Elisp code to
+;; match other sequence types, not just strings.
 ;;
 ;; A tagged NFA can be created from a regular expression using
-;; `tNFA-from-regexp', and it's state can be updated using
+;; `tNFA-from-regexp', and its state can be updated using
 ;; `tNFA-next-state'. You can discover whether a state is a matching
 ;; state using `tNFA-match-p', extract subgroup capture data from it
 ;; using `tNFA-group-data', check whether a state has any wildcard
@@ -58,20 +60,23 @@
 ;; meaning of that phrase. Emacs regexps implement additional features
 ;; (in particular, back-references) that allow them to match far more
 ;; than just regular languages. This comes at a cost: regexp matching
-;; can potentially be very slow (NP-hard, though the hard cases rarely
-;; crop up in practise), whereas there are efficient (polynomial-time)
-;; algorithms for matching regular expressions (in the original
-;; sense). Therefore, this package only supports a subset of the full
-;; Emacs regular expression syntax. See the function docstrings for more
-;; information.
+;; can potentially be very slow (NP-hard in fact, though the hard cases
+;; rarely crop up in practise), whereas there are efficient
+;; (polynomial-time) algorithms for matching regular expressions (in the
+;; original sense). Therefore, this package only supports a subset of
+;; the full Emacs regular expression syntax. See the function docstrings
+;; for more information.
 ;;
 ;; This package essentially implements Laurikari's algorithm, as
 ;; described in his master's thesis, but it builds the corresponding
 ;; tagged deterministic finite state automaton (DFA) on-the-fly as
 ;; needed.
+;;
+;; This package uses the queue package queue.el.
 
 
 ;;; Change Log:
+;;
 ;; Version 0.1.1
 ;; * work-around mysterious byte-compiler bug by defining
 ;;   `tNFA--NFA-state-create' and `tNFA--NFA-state-create-tag' via
@@ -445,7 +450,7 @@
   ;; Convert TAGS table to a list of indices of group matches. The n'th
   ;; element of the list is a cons cell, whose car is the starting index
   ;; of the nth group and whose cdr is its end index. If a group didn't
-  ;; match, the corresponding list element will by null."
+  ;; match, the corresponding list element will be null."
   (let ((groups (make-list (/ (length tags) 2) nil))
 	group-stack
 	(grp 0))
@@ -963,7 +968,7 @@ POS in a string."
   ;; Return the tagged epsilon-boundary of the NFA states listed in
   ;; STATE-SET, that is the set of all states that can be reached via
   ;; epsilon transitions from some state in STATE-SET (not including
-  ;; those in STATE-SET).
+  ;; states in STATE-SET itself).
   (let ((queue (queue-create))
 	(result '())
 	(reset '())
