@@ -1,4 +1,3 @@
-
 ;;; tNFA.el --- tagged non-deterministic finite-state automata
 
 
@@ -10,65 +9,63 @@
 ;;           tNFA, NFA, DFA, finite state automata, automata, regexp
 ;; Package-Requires: ((queue "0.1"))
 ;; URL: http://www.dr-qubit.org/emacs.php
-
+;; Repository: http://www.dr-qubit.org/git/predictive.git
 
 ;; This file is part of Emacs.
 ;;
-;; GNU Emacs is free software: you can redistribute it and/or modify
-;; it under the terms of the GNU General Public License as published by
-;; the Free Software Foundation, either version 3 of the License, or
-;; (at your option) any later version.
+;; GNU Emacs is free software: you can redistribute it and/or modify it under
+;; the terms of the GNU General Public License as published by the Free
+;; Software Foundation, either version 3 of the License, or (at your option)
+;; any later version.
 ;;
-;; GNU Emacs is distributed in the hope that it will be useful,
-;; but WITHOUT ANY WARRANTY; without even the implied warranty of
-;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-;; GNU General Public License for more details.
+;; GNU Emacs is distributed in the hope that it will be useful, but WITHOUT
+;; ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+;; FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+;; more details.
 ;;
-;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; You should have received a copy of the GNU General Public License along
+;; with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
 
 
 ;;; Commentary:
 ;;
-;; A tagged, non-deterministic finite state automata (NFA) is an
-;; abstract computing machine that recognises regular languages. In
-;; layman's terms, they are used to decide whether a string matches a
-;; regular expression. The "tagged" part allows the NFA to do
-;; group-capture: it returns information about which parts of a string
-;; matched which subgroup of the regular expression.
+;; A tagged, non-deterministic finite state automata (NFA) is an abstract
+;; computing machine that recognises regular languages. In layman's terms,
+;; they are used to decide whether a string matches a regular expression. The
+;; "tagged" part allows the NFA to do group-capture: it returns information
+;; about which parts of a string matched which subgroup of the regular
+;; expression.
 ;;
 ;; Why re-implement regular expression matching when Emacs comes with
-;; extensive built-in support for regexps? Primarily, because some
-;; algorithms require access to the NFA states produced part way through
-;; the regular expression matching process (see the trie.el package for
-;; an example). Secondarily, because Emacs regexps only work on strings,
-;; whereas regular expressions can usefully be used in Elisp code to
-;; match other sequence types, not just strings.
+;; extensive built-in support for regexps? Primarily, because some algorithms
+;; require access to the NFA states produced part way through the regular
+;; expression matching process (see the trie.el package for an
+;; example). Secondarily, because Emacs regexps only work on strings, whereas
+;; regular expressions can usefully be used in Elisp code to match other
+;; sequence types, not just strings.
 ;;
 ;; A tagged NFA can be created from a regular expression using
 ;; `tNFA-from-regexp', and its state can be updated using
-;; `tNFA-next-state'. You can discover whether a state is a matching
-;; state using `tNFA-match-p', extract subgroup capture data from it
-;; using `tNFA-group-data', check whether a state has any wildcard
-;; transitions using `tNFA-wildcard-p', and get a list of non-wildcard
-;; transitions using `tNFA-transitions'. Finally, `tNFA-regexp-match'
-;; uses tagged NFAs to decide whether a regexp matches a given string.
+;; `tNFA-next-state'. You can discover whether a state is a matching state
+;; using `tNFA-match-p', extract subgroup capture data from it using
+;; `tNFA-group-data', check whether a state has any wildcard transitions using
+;; `tNFA-wildcard-p', and get a list of non-wildcard transitions using
+;; `tNFA-transitions'. Finally, `tNFA-regexp-match' uses tagged NFAs to decide
+;; whether a regexp matches a given string.
 ;;
 ;; Note that Emacs' regexps are not regular expressions in the original
-;; meaning of that phrase. Emacs regexps implement additional features
-;; (in particular, back-references) that allow them to match far more
-;; than just regular languages. This comes at a cost: regexp matching
-;; can potentially be very slow (NP-hard in fact, though the hard cases
-;; rarely crop up in practise), whereas there are efficient
-;; (polynomial-time) algorithms for matching regular expressions (in the
-;; original sense). Therefore, this package only supports a subset of
-;; the full Emacs regular expression syntax. See the function docstrings
-;; for more information.
+;; meaning of that phrase. Emacs regexps implement additional features (in
+;; particular, back-references) that allow them to match far more than just
+;; regular languages. This comes at a cost: regexp matching can potentially be
+;; very slow (NP-hard in fact, though the hard cases rarely crop up in
+;; practise), whereas there are efficient (polynomial-time) algorithms for
+;; matching regular expressions (in the original sense). Therefore, this
+;; package only supports a subset of the full Emacs regular expression
+;; syntax. See the function docstrings for more information.
 ;;
-;; This package essentially implements Laurikari's algorithm, as
-;; described in his master's thesis, but it builds the corresponding
-;; tagged deterministic finite state automaton (DFA) on-the-fly as
-;; needed.
+;; This package essentially implements Laurikari's algorithm, as described in
+;; his master's thesis, but it builds the corresponding tagged deterministic
+;; finite state automaton (DFA) on-the-fly as needed.
 ;;
 ;; This package uses the queue package queue.el.
 
@@ -77,8 +74,8 @@
 ;;
 ;; Version 0.1.1
 ;; * work-around mysterious byte-compiler bug by defining
-;;   `tNFA--NFA-state-create' and `tNFA--NFA-state-create-tag' via
-;;   `defun' instead of directly in `defstruct'
+;;   `tNFA--NFA-state-create' and `tNFA--NFA-state-create-tag' via `defun'
+;;   instead of directly in `defstruct'
 ;;
 ;; Version 0.1
 ;; * initial version
@@ -89,7 +86,6 @@
 
 (eval-when-compile (require 'cl))
 (require 'queue)
-(provide 'tNFA)
 
 
 
@@ -1110,8 +1106,7 @@ beginning and end of the regexp to get an unanchored match)."
   (tNFA--tags-to-groups (tNFA--DFA-state-match tNFA)))
 
 
-;;; Local Variables:
-;;; fill-column: 72
-;;; End:
+
+(provide 'tNFA)
 
 ;;; tNFA.el ends here
