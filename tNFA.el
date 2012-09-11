@@ -69,18 +69,6 @@
 ;; This package uses the queue package queue.el.
 
 
-;;; Change Log:
-;;
-;; Version 0.1.1
-;; * work-around mysterious byte-compiler bug by defining
-;;   `tNFA--NFA-state-create' and `tNFA--NFA-state-create-tag' via `defun'
-;;   instead of directly in `defstruct'
-;;
-;; Version 0.1
-;; * initial version
-
-
-
 ;;; Code:
 
 (eval-when-compile (require 'cl))
