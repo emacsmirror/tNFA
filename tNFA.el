@@ -1,3 +1,4 @@
+;; -*- lexical-binding: t; -*-
 ;;; tNFA.el --- Tagged non-deterministic finite-state automata
 
 ;; Copyright (C) 2008-2010, 2012   Free Software Foundation, Inc
@@ -322,7 +323,7 @@
   ;; create DFA state and add it to the state pool
   (let ((DFA-state (tNFA--DFA-state--create
 		    state-list state-pool :test test))
-	tmp-list)
+	transition)
     (puthash state-list DFA-state (tNFA--DFA-state-pool DFA-state))
 
     (dolist (state state-list)
@@ -330,16 +331,20 @@
       (cond
        ;; literal state: add literal transition
        ((eq (tNFA--state-type state) 'literal)
-	(setq tmp-list (tNFA--DFA-state-transitions DFA-state))
-	(add-to-list 'tmp-list (cons (tNFA--state-label state) t))
-	(setf (tNFA--DFA-state-transitions DFA-state) tmp-list))
+	(setq transition (cons (tNFA--state-label state) t))
+	(unless (member transition (tNFA--DFA-state-transitions DFA-state))
+	  (setf (tNFA--DFA-state-transitions DFA-state)
+		(append (tNFA--DFA-state-transitions DFA-state)
+			(list transition)))))
 
        ;; character alternative: add transitions for all alternatives
        ((eq (tNFA--state-type state) 'char-alt)
 	(dolist (c (tNFA--state-label state))
-	  (setq tmp-list (tNFA--DFA-state-transitions DFA-state))
-	  (add-to-list 'tmp-list (cons c t))
-	  (setf (tNFA--DFA-state-transitions DFA-state) tmp-list)))
+	  (setq transition (cons c t))
+	  (unless (member transition (tNFA--DFA-state-transitions DFA-state))
+	    (setf (tNFA--DFA-state-transitions DFA-state)
+		  (append (tNFA--DFA-state-transitions DFA-state)
+			(list transition))))))
 
        ;; wildcard or negated character alternative: add wildcard
        ;; transistion
