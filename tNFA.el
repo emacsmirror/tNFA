@@ -80,7 +80,7 @@
 ;;; ================================================================
 ;;;                  Replcements for CL functions
 
-(defun* tNFA--assoc (item alist &key (test 'eq))
+(defun* tNFA--assoc (item alist &key (test #'eq))
   ;; Return first cons cell in ALIST whose CAR matches ITEM according to
   ;; :test function (defaulting to `eq')
   (while (and alist
@@ -312,14 +312,14 @@
    (:constructor tNFA--DFA-state--create
 		 (list pool
 		  &key
-		  (test 'eq)
+		  (test #'eq)
 		  &aux
 		  (transitions ())))
    (:copier nil))
   list transitions test wildcard match pool)
 
 
-(defun* tNFA--DFA-state-create (state-list state-pool &key (test 'eq))
+(defun* tNFA--DFA-state-create (state-list state-pool &key (test #'eq))
   ;; create DFA state and add it to the state pool
   (let ((DFA-state (tNFA--DFA-state--create
 		    state-list state-pool :test test))
@@ -361,10 +361,10 @@
     DFA-state))
 
 
-(defun* tNFA--DFA-state-create-initial (state-list &key (test 'eq))
+(defun* tNFA--DFA-state-create-initial (state-list &key (test #'eq))
   ;; create initial DFA state from initial tNFA state INITIAL-STATE
   (tNFA--DFA-state-create state-list
-			  (make-hash-table :test 'equal)
+			  (make-hash-table :test #'equal)
 			  :test test))
 
 
@@ -379,7 +379,7 @@
 
 (defun tNFA-transitions (state)
   "Return list of literal transitions from tNFA state STATE."
-  (mapcar 'car (tNFA--DFA-state-transitions state)))
+  (mapcar #'car (tNFA--DFA-state-transitions state)))
 
 
 
@@ -458,7 +458,7 @@
 ;;;                        Regexp -> tNFA
 
 ;;;###autoload
-(defun* tNFA-from-regexp (regexp &key (test 'eq))
+(defun* tNFA-from-regexp (regexp &key (test #'eq))
   "Create a tagged NFA that recognizes the regular expression REGEXP.
 The return value is the initial state of the tagged NFA.
 
@@ -484,7 +484,7 @@ beginning and end of the regexp to get an unanchored match)."
   (declare (special NFA--state-id))
   (destructuring-bind (fragment num-tags min-tags max-tags regexp)
       (let ((NFA--state-id -1))
-	(tNFA--from-regexp (append regexp nil) 0 '() '() 'top-level))
+	(tNFA--from-regexp (append regexp nil) 0 '() '() 'top))
     (if regexp
 	(error "Syntax error in regexp: missing \"(\"")
       (setf (tNFA--NFA-state-type (tNFA--fragment-final fragment))
@@ -511,10 +511,10 @@ beginning and end of the regexp to get an unanchored match)."
 
 
 (defun tNFA--from-regexp (regexp num-tags min-tags max-tags
-				 &optional top-level shy-group)
+				 &optional toplevel shy-group)
   ;; Construct a tagged NFA fragment from REGEXP, up to first end-group
   ;; character or end of REGEXP. The TAGS arguments are used to pass the
-  ;; tags created so far. A non-nil TOP-LEVEL indicates that REGEXP is
+  ;; tags created so far. A non-nil TOPLEVEL indicates that REGEXP is
   ;; the complete regexp, so we're constructing the entire tNFA. A
   ;; non-nil SHY-GROUP indicates that we're constructing a shy subgroup
   ;; fragment. (Both optional arguments are only used for spotting
@@ -541,12 +541,12 @@ beginning and end of the regexp to get an unanchored match)."
 	;; ----- construct new fragment -----
 	(cond
 	 ;; syntax error: missing )
-	 ((and (null type) (not top-level))
+	 ((and (null type) (not toplevel))
 	  (error "Syntax error in regexp:\
  extra \"(\" or missing \")\""))
 
 	 ;; syntax error: extra )
-	 ((and (eq type 'shy-group-end) top-level)
+	 ((and (eq type 'shy-group-end) toplevel)
 	  (error "Syntax error in regexp:\
  extra \")\" or missing \"(\""))
 
@@ -1042,7 +1042,7 @@ POS in a string."
 ;;;                       tNFA matching
 
 ;;;###autoload
-(defun* tNFA-regexp-match (regexp string &key (test 'eq))
+(defun* tNFA-regexp-match (regexp string &key (test #'eq))
   "Return non-nil if STRING matches REGEXP, nil otherwise.
 Sets the match data if there was a match; see `match-beginning',
 `match-end' and `match-string'.
