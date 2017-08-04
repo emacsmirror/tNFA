@@ -131,7 +131,7 @@
 ;;; ----------------------------------------------------------------
 ;;;                         NFA states
 
-(declare (special NFA--state-id))
+(defvar NFA--state-id)
 
 (defstruct
   (tNFA--NFA-state
@@ -193,8 +193,8 @@
 ;; tag number for a tagged epsilon transition is stored in label slot
 (defalias 'tNFA--NFA-state-tag 'tNFA--NFA-state-label)
 
-(defmacro tNFA--NFA-state-tags (state)
-  `(tNFA--state-tags (tNFA--NFA-state-tNFA-state ,state)))
+(defsubst tNFA--NFA-state-tags (state)
+  (tNFA--state-tags (tNFA--NFA-state-tNFA-state state)))
 
 
 (defun tNFA--NFA-state-patch (attach state)
@@ -406,19 +406,19 @@
     vec))
 
 
-(defmacro tNFA--tags-set (tags tag val)
+(defsubst tNFA--tags-set (tags tag val)
   ;; set value of TAG in TAGS table to VAL
-  `(setcar (aref ,tags ,tag) ,val))
+  (setcar (aref tags tag) val))
 
 
-(defmacro tNFA--tags-get (tags tag)
+(defsubst tNFA--tags-get (tags tag)
   ;; get value of TAG in TAGS table
-  `(car (aref ,tags ,tag)))
+  (car (aref tags tag)))
 
 
-(defmacro tNFA--tags-type (tags tag)
+(defsubst tNFA--tags-type (tags tag)
   ;; return tag type ('min or 'max)
-  `(cdr (aref ,tags ,tag)))
+  (cdr (aref tags tag)))
 
 
 (defun tNFA--tags< (val tag tags)
@@ -499,15 +499,15 @@ beginning and end of the regexp to get an unanchored match)."
       )))
 
 
-(defmacro tNFA--regexp-postfix-p (regexp)
+(defsubst tNFA--regexp-postfix-p (regexp)
   ;; return t if next token in REGEXP is a postfix operator, nil
   ;; otherwise
-  `(or (eq (car ,regexp) ?*)
-       (eq (car ,regexp) ?+)
-       (eq (car ,regexp) ??)
-       (and (eq (car ,regexp) ?\\)
-	    (cdr ,regexp)
-	    (eq (cadr ,regexp) ?{))))
+  (or (eq (car regexp) ?*)
+      (eq (car regexp) ?+)
+      (eq (car regexp) ??)
+      (and (eq (car regexp) ?\\)
+	   (cdr regexp)
+	   (eq (cadr regexp) ?{))))
 
 
 (defun tNFA--from-regexp (regexp num-tags min-tags max-tags
