@@ -1,13 +1,12 @@
-;; -*- lexical-binding: t; -*-
-;;; tNFA.el --- Tagged non-deterministic finite-state automata
+;;; tNFA.el --- Tagged non-deterministic finite-state automata  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2008-2010, 2012   Free Software Foundation, Inc
+;; Copyright (C) 2008-2024  Free Software Foundation, Inc
 
 ;; Author: Toby Cubitt <toby-predictive@dr-qubit.org>
 ;; Version: 0.1.1
 ;; Keywords: extensions, matching, data structures
 ;;           tNFA, NFA, DFA, finite state automata, automata, regexp
-;; Package-Requires: ((queue "0.1"))
+;; Package-Requires: ((queue "0.1") (cl-lib "0.5"))
 ;; URL: http://www.dr-qubit.org/emacs.php
 ;; Repository: http://www.dr-qubit.org/git/predictive.git
 
@@ -72,7 +71,7 @@
 
 ;;; Code:
 
-(eval-when-compile (require 'cl))
+(eval-when-compile (require 'cl-lib))
 (require 'queue)
 
 
@@ -80,12 +79,12 @@
 ;;; ================================================================
 ;;;                  Replcements for CL functions
 
-(defun* tNFA--assoc (item alist &key (test #'eq))
+(cl-defun tNFA--assoc (item alist &key (test #'eq))
   ;; Return first cons cell in ALIST whose CAR matches ITEM according to
   ;; :test function (defaulting to `eq')
   (while (and alist
-	      (or (not (consp (car alist)))
-		  (not (funcall test item (caar alist)))))
+	      (not (and (consp (car alist))
+	                (funcall test item (caar alist)))))
     (setq alist (cdr alist)))
   (car alist))
 
@@ -97,7 +96,7 @@
 ;;; ----------------------------------------------------------------
 ;;;                    tagged NFA states
 
-(defstruct
+(cl-defstruct
   (tNFA--state
    (:constructor nil)
    (:constructor tNFA--state-create-initial
@@ -133,7 +132,7 @@
 
 (defvar NFA--state-id)
 
-(defstruct
+(cl-defstruct
   (tNFA--NFA-state
    (:type vector)
    (:constructor nil)
@@ -142,11 +141,11 @@
 		  &aux
 		  (in-degree 0)
 		  (count 0)
-		  (id (incf NFA--state-id))
+		  (id (cl-incf NFA--state-id))
 		  ;; (dummy
 		  ;;  (when next
 		  ;;    (setf (tNFA--NFA-state-count next)
-		  ;; 	   (incf (tNFA--NFA-state-in-degree next)))))
+		  ;; 	   (cl-incf (tNFA--NFA-state-in-degree next)))))
 		  ))
    (:constructor tNFA--NFA-state-create-branch
 		 (&rest next
@@ -154,7 +153,7 @@
 		  (type 'branch)
 		  (in-degree 0)
 		  (count 0)
-		  (id (incf NFA--state-id))))
+		  (id (cl-incf NFA--state-id))))
    (:constructor tNFA---NFA-state-create-tag
 		 (tag &optional next
 		  &aux
@@ -162,11 +161,11 @@
 		  (label tag)
 		  (in-degree 0)
 		  (count 0)
-		  (id (incf NFA--state-id))
+		  (id (cl-incf NFA--state-id))
 		  ;; (dummy
 		  ;;  (when next
 		  ;;    (setf (tNFA--NFA-state-count next)
-		  ;; 	   (incf (tNFA--NFA-state-in-degree next)))))
+		  ;; 	   (cl-incf (tNFA--NFA-state-in-degree next)))))
 		  ))
    (:copier nil))
   id type label in-degree
@@ -180,18 +179,18 @@
 (defun tNFA--NFA-state-create (&optional type label next)
   (when next
     (setf (tNFA--NFA-state-count next)
-	  (incf (tNFA--NFA-state-in-degree next))))
+	  (cl-incf (tNFA--NFA-state-in-degree next))))
     (tNFA---NFA-state-create type label next))
 
 (defun tNFA--NFA-state-create-tag (tag &optional next)
   (when next
     (setf (tNFA--NFA-state-count next)
-	  (incf (tNFA--NFA-state-in-degree next))))
+	  (cl-incf (tNFA--NFA-state-in-degree next))))
     (tNFA---NFA-state-create-tag tag next))
 
 
 ;; tag number for a tagged epsilon transition is stored in label slot
-(defalias 'tNFA--NFA-state-tag 'tNFA--NFA-state-label)
+(defalias 'tNFA--NFA-state-tag #'tNFA--NFA-state-label)
 
 (defsubst tNFA--NFA-state-tags (state)
   (tNFA--state-tags (tNFA--NFA-state-tNFA-state state)))
@@ -207,7 +206,7 @@
    (tNFA--NFA-state-next attach)
      (tNFA--NFA-state-next state)
    (tNFA--NFA-state-count state)
-     (incf (tNFA--NFA-state-in-degree state))))
+     (cl-incf (tNFA--NFA-state-in-degree state))))
 
 
 (defun tNFA--NFA-state-make-epsilon (state next)
@@ -217,7 +216,7 @@
    (tNFA--NFA-state-label state) nil
    (tNFA--NFA-state-next state)  next
    (tNFA--NFA-state-count next)
-     (incf (tNFA--NFA-state-in-degree next))))
+     (cl-incf (tNFA--NFA-state-in-degree next))))
 
 
 (defun tNFA--NFA-state-make-branch (state next)
@@ -227,7 +226,7 @@
 	(tNFA--NFA-state-next state)  next)
   (dolist (n next)
     (setf (tNFA--NFA-state-count n)
-	  (incf (tNFA--NFA-state-in-degree n)))))
+	  (cl-incf (tNFA--NFA-state-in-degree n)))))
 
 
 (defun tNFA--NFA-state-copy (state)
@@ -236,7 +235,7 @@
   ;; recursively copy a chain of states. Note: NFA--state-id must be
   ;; bound to something appropriate when this function is called.
   (let ((copy (copy-sequence state)))
-    (setf (tNFA--NFA-state-id copy) (incf NFA--state-id))
+    (setf (tNFA--NFA-state-id copy) (cl-incf NFA--state-id))
     copy))
 
 
@@ -244,7 +243,7 @@
 ;;; ----------------------------------------------------------------
 ;;;                        NFA fragments
 
-(defstruct
+(cl-defstruct
   (tNFA--fragment
    (:type vector)
    (:constructor nil)
@@ -262,7 +261,7 @@
 
 (defun tNFA--fragment-copy (fragment)
   ;; return a copy of FRAGMENT.
-  (declare (special copied-states))
+  (defvar copied-states)
   (let (copied-states)
     (tNFA--fragment-create
      (tNFA--do-fragment-copy (tNFA--fragment-initial fragment))
@@ -273,7 +272,7 @@
   ;; return a copy of STATE, recursively following and copying links
   ;; (note: NFA--state-id must be bound to something appropriate when
   ;; this is called)
-  (declare (special copied-states))
+  (defvar copied-states)
   (let ((copy (tNFA--NFA-state-copy state)))
     (push (cons state copy) copied-states)
 
@@ -305,7 +304,7 @@
 ;;; ----------------------------------------------------------------
 ;;;                      DFA states
 
-(defstruct
+(cl-defstruct
   (tNFA--DFA-state
    :named
    (:constructor nil)
@@ -319,7 +318,7 @@
   list transitions test wildcard match pool)
 
 
-(defun* tNFA--DFA-state-create (state-list state-pool &key (test #'eq))
+(cl-defun tNFA--DFA-state-create (state-list state-pool &key (test #'eq))
   ;; create DFA state and add it to the state pool
   (let ((DFA-state (tNFA--DFA-state--create
 		    state-list state-pool :test test))
@@ -348,8 +347,7 @@
 
        ;; wildcard or negated character alternative: add wildcard
        ;; transistion
-       ((or (eq (tNFA--state-type state) 'wildcard)
-	    (eq (tNFA--state-type state) 'neg-char-alt))
+       ((memq (tNFA--state-type state) '(wildcard neg-char-alt))
 	(setf (tNFA--DFA-state-wildcard DFA-state) t))
 
        ;; match state: set match tags
@@ -361,18 +359,18 @@
     DFA-state))
 
 
-(defun* tNFA--DFA-state-create-initial (state-list &key (test #'eq))
+(cl-defun tNFA--DFA-state-create-initial (state-list &key (test #'eq))
   ;; create initial DFA state from initial tNFA state INITIAL-STATE
   (tNFA--DFA-state-create state-list
 			  (make-hash-table :test #'equal)
 			  :test test))
 
 
-(defalias 'tNFA-match-p 'tNFA--DFA-state-match
+(defalias 'tNFA-match-p #'tNFA--DFA-state-match
   "Return non-nil if STATE is a matching state, otherwise return nil.")
 
 
-(defalias 'tNFA-wildcard-p 'tNFA--DFA-state-wildcard
+(defalias 'tNFA-wildcard-p #'tNFA--DFA-state-wildcard
   "Return non-nil if STATE has a wildcard transition,
  otherwise return nil.")
 
@@ -448,7 +446,7 @@
 			(tNFA--tags-get tags i))))
 	(unless (= (tNFA--tags-get tags i) -1)
 	  (push (cons grp (tNFA--tags-get tags i)) group-stack))
-	(incf grp)))
+	(cl-incf grp)))
     groups))
 
 
@@ -458,7 +456,7 @@
 ;;;                        Regexp -> tNFA
 
 ;;;###autoload
-(defun* tNFA-from-regexp (regexp &key (test #'eq))
+(cl-defun tNFA-from-regexp (regexp &key (test #'eq))
   "Create a tagged NFA that recognizes the regular expression REGEXP.
 The return value is the initial state of the tagged NFA.
 
@@ -481,8 +479,8 @@ loses its special meaning. Also, matches are always anchored, so
 beginning and end of the regexp to get an unanchored match)."
 
   ;; convert regexp to list, build NFA, and return initial state
-  (declare (special NFA--state-id))
-  (destructuring-bind (fragment num-tags min-tags max-tags regexp)
+  (defvar NFA--state-id)
+  (cl-destructuring-bind (fragment num-tags min-tags max-tags regexp)
       (let ((NFA--state-id -1))
 	(tNFA--from-regexp (append regexp nil) 0 '() '() 'top))
     (if regexp
@@ -502,9 +500,7 @@ beginning and end of the regexp to get an unanchored match)."
 (defsubst tNFA--regexp-postfix-p (regexp)
   ;; return t if next token in REGEXP is a postfix operator, nil
   ;; otherwise
-  (or (eq (car regexp) ?*)
-      (eq (car regexp) ?+)
-      (eq (car regexp) ??)
+  (or (memq (car regexp) '(?* ?+ ??))
       (and (eq (car regexp) ?\\)
 	   (cdr regexp)
 	   (eq (cadr regexp) ?{))))
@@ -565,8 +561,7 @@ beginning and end of the regexp to get an unanchored match)."
 
 
 	 ;; regexp atom: construct new literal fragment
-	 ((or (eq type 'literal) (eq type 'wildcard)
-	      (eq type 'char-alt) (eq type 'neg-char-alt))
+	 ((memq type '(literal wildcard char-alt neg-char-alt))
 	  (setq new (tNFA--NFA-state-create
 		     type token (tNFA--NFA-state-create))
 		fragment (tNFA--fragment-create
@@ -589,13 +584,13 @@ beginning and end of the regexp to get an unanchored match)."
 	  (setq fragment
 		(tNFA--fragment-create
 		 (tNFA--NFA-state-create-tag
-		  (car (push (1- (incf num-tags)) min-tags))
+		  (car (push (1- (cl-incf num-tags)) min-tags))
 		  new)
 		 new))
 	  (tNFA--fragment-patch (car fragment-stack) fragment)
 	  ;; reserve next tag number for subgroup end tag
 	  (setq group-end-tag num-tags)
-	  (incf num-tags)
+	  (cl-incf num-tags)
 	  ;; recursively construct subgroup fragment
 	  (setq new (tNFA--from-regexp
 		     regexp num-tags min-tags max-tags)
@@ -607,7 +602,7 @@ beginning and end of the regexp to get an unanchored match)."
 
 
 	 ;; end of regexp or subgroup: ...
-	 ((or (null type) (eq type 'shy-group-end) (eq type 'group-end))
+	 ((memq type '(nil shy-group-end group-end))
 
 	  ;; if fragment-stack contains only one fragment, throw
 	  ;; fragment up to recursion level above
@@ -642,7 +637,7 @@ beginning and end of the regexp to get an unanchored match)."
 		     (tNFA--fragment-initial fragment)))
 	      (setf (tNFA--NFA-state-count
 		     (tNFA--fragment-initial frag))
-		    (incf (tNFA--NFA-state-in-degree
+		    (cl-incf (tNFA--NFA-state-in-degree
 			   (tNFA--fragment-initial frag))))
 	      (tNFA--NFA-state-make-epsilon (tNFA--fragment-final frag)
 				      (tNFA--fragment-final fragment)))
@@ -720,9 +715,9 @@ beginning and end of the regexp to get an unanchored match)."
 	       ;;
 	       ((eq (car token) 0)
 		;; ? postfix = \{0,1\}: after this we're done
-		(if (eq (cdr token) 1)
-		    (setq copy nil)
-		  (setq copy (tNFA--fragment-copy fragment)))
+		(setq copy (if (eq (cdr token) 1)
+		               nil
+		             (tNFA--fragment-copy fragment)))
 		;; attach fragment
 		(tNFA--NFA-state-make-branch
 		 attach (list (tNFA--fragment-initial fragment) new))
@@ -730,7 +725,7 @@ beginning and end of the regexp to get an unanchored match)."
 		 (tNFA--fragment-final fragment) new)
 		(setf (tNFA--fragment-final (car fragment-stack)) new)
 		;; prepare for next iteration
-		(decf (cdr token))
+		(cl-decf (cdr token))
 		(setq fragment copy))
 
 	       ;; \{n,\} or \{n,m\}:
@@ -741,12 +736,11 @@ beginning and end of the regexp to get an unanchored match)."
 		(setq copy (tNFA--fragment-copy fragment))
 		(tNFA--fragment-patch (car fragment-stack) fragment)
 		;; prepare for next iteration
-		(decf (car token))
-		(when (cdr token) (decf (cdr token)))
-		(if (eq (cdr token) 0)
-		    (setq fragment nil)
-		  (setq fragment copy)))
-	       )))
+		(cl-decf (car token))
+		(when (cdr token) (cl-decf (cdr token)))
+		(setq fragment (if (eq (cdr token) 0)
+		                   nil
+		                 copy))))))
 
 
 	  ;; if ending a group, add a maximize tag to end
@@ -837,8 +831,7 @@ beginning and end of the regexp to get an unanchored match)."
 	  (while (if (null regexp)
 		     (error "Syntax error in regexp:\
  malformed \\{...\\}")
-		   (not (or (eq (car regexp) ?,)
-			    (eq (car regexp) ?\\))))
+		   (not (memq (car regexp) '(?, ?\\))))
 	    (setcar token
 		    (concat (car token) (char-to-string (pop regexp)))))
 	  (if (null (car token))
@@ -972,8 +965,7 @@ POS in a string."
       (cond
        ;; branch or epsilon: add next states as necessary, copying tags
        ;; across
-       ((or (eq (tNFA--NFA-state-type state) 'branch)
-	    (eq (tNFA--NFA-state-type state) 'epsilon))
+       ((memq (tNFA--NFA-state-type state) '(branch epsilon))
 	(dolist (next (if (eq (tNFA--NFA-state-type state) 'epsilon)
 			  (list (tNFA--NFA-state-next state))
 			(tNFA--NFA-state-next state)))
@@ -984,7 +976,7 @@ POS in a string."
 	    (push next reset)
 	    ;; if next state hasn't already been seen in-degree times,
 	    ;; add it to the end of the queue
-	    (if (/= (decf (tNFA--NFA-state-count next)) 0)
+	    (if (/= (cl-decf (tNFA--NFA-state-count next)) 0)
 		(queue-enqueue queue next)
 	      ;; if it has now been seen in-degree times, reset count
 	      ;; and add it back to the front of the queue
@@ -1013,7 +1005,7 @@ POS in a string."
 	    (push next reset))
 	  ;; if next state hasn't already been seen in-degree times, add
 	  ;; it to the end of the queue
-	  (if (/= (decf (tNFA--NFA-state-count next)) 0)
+	  (if (/= (cl-decf (tNFA--NFA-state-count next)) 0)
 	      (queue-enqueue queue next)
 	    ;; if it has now been seen in-degree times, reset count and
 	    ;; add it back to the front of the queue
@@ -1042,7 +1034,7 @@ POS in a string."
 ;;;                       tNFA matching
 
 ;;;###autoload
-(defun* tNFA-regexp-match (regexp string &key (test #'eq))
+(cl-defun tNFA-regexp-match (regexp string &key (test #'eq))
   "Return non-nil if STRING matches REGEXP, nil otherwise.
 Sets the match data if there was a match; see `match-beginning',
 `match-end' and `match-string'.
@@ -1071,7 +1063,7 @@ beginning and end of the regexp to get an unanchored match)."
     ;; evolve tNFA according to characters of STRING
     (catch 'fail
       (dolist (chr (append string nil))
-	(unless (setq tNFA (tNFA-next-state tNFA chr (incf i)))
+	(unless (setq tNFA (tNFA-next-state tNFA chr (cl-incf i)))
 	  (throw 'fail nil)))
 
       ;; if REGEXP matched...
@@ -1086,7 +1078,7 @@ beginning and end of the regexp to get an unanchored match)."
 	      (unless (= (tNFA--tags-get tags i) -1)
 		(setf (nth (1+ (* 2 (pop group-stack))) match-data)
 		      (tNFA--tags-get tags i)))
-	    (incf grp)
+	    (cl-incf grp)
 	    (unless (= (tNFA--tags-get tags i) -1)
 	      (push grp group-stack)
 	      (setf (nth (* 2 grp) match-data)
